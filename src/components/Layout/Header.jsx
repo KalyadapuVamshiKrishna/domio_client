@@ -28,7 +28,7 @@ export default function Header() {
 
   function handleSearch() {
     if (!location) return; // optional: prevent empty search
-  const params = new URLSearchParams({ query: location, checkIn, checkOut, guests }).toString();
+  const params = new URLSearchParams({  location, checkIn, checkOut, guests }).toString();
   navigate(`/?${params}`);
   }
 
