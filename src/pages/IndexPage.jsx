@@ -113,7 +113,7 @@ export default function IndexPage() {
   }
 
   return (
-    <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-12">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">
         Explore Stays
       </h1>

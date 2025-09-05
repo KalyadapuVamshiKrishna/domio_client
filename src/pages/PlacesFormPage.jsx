@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Trash2, X } from "lucide-react";
 
 export default function PlacesFormPage() {
   const { id } = useParams();
@@ -22,6 +23,9 @@ export default function PlacesFormPage() {
   const [maxGuests, setMaxGuests] = useState(1);
   const [price, setPrice] = useState(100);
   const [redirect, setRedirect] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -65,6 +69,21 @@ export default function PlacesFormPage() {
     } catch (e) {
       console.error("Save place error:", e.response?.data || e.message);
       alert("Failed to save. Please try again.");
+    }
+  }
+
+  async function deletePlace() {
+    if (!id) return;
+    try {
+      setIsDeleting(true);
+      await axios.delete(`/places/${id}`, { withCredentials: true });
+      setRedirect(true);
+    } catch (error) {
+      console.error("Error deleting place:", error);
+      alert("Failed to delete. Please try again.");
+    } finally {
+      setIsDeleting(false);
+      setConfirmModal(false);
     }
   }
 
@@ -195,16 +214,56 @@ export default function PlacesFormPage() {
           </div>
         </div>
 
-        {/* ✅ Save Button */}
-        <div className="flex justify-end">
+        {/* ✅ Buttons */}
+        <div className="flex justify-between items-center">
+          {id && (
+            <Button
+              variant="destructive"
+              type="button"
+              onClick={() => setConfirmModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" /> Delete
+            </Button>
+          )}
           <Button
-            className="w-full sm:w-auto px-6 py-3 text-base font-semibold rounded-lg bg-rose-500 hover:bg-rose-600 text-white"
+            className="px-6 py-3 text-base font-semibold rounded-lg bg-rose-500 hover:bg-rose-600 text-white"
             type="submit"
           >
             Save Place
           </Button>
         </div>
       </form>
+
+      {/* ✅ Delete Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative">
+            <button
+              onClick={() => setConfirmModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-semibold mb-4 text-red-600">Delete Place?</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this place? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-4">
+              <Button variant="outline" onClick={() => setConfirmModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={deletePlace}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Yes, Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

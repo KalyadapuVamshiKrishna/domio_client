@@ -9,8 +9,11 @@ import { MapPin, Trash2, X } from "lucide-react";
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState([]);
-  const [modalMessage, setModalMessage] = useState(""); // Message for modal
-  const [showModal, setShowModal] = useState(false);    // Modal visibility
+  const [modalMessage, setModalMessage] = useState("");
+  const [showModal, setShowModal] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
 
   useEffect(() => {
     axios.get("/bookings").then((response) => {
@@ -23,7 +26,6 @@ export default function BookingsPage() {
       await axios.delete(`/bookings/${id}`);
       setBookings((prev) => prev.filter((b) => b._id !== id));
 
-      // Show modal after deletion
       setModalMessage(
         "Your booking has been canceled. The refund will be processed in 4 to 7 working days."
       );
@@ -33,10 +35,22 @@ export default function BookingsPage() {
     }
   };
 
+  const openConfirmModal = (id) => {
+    setSelectedBookingId(id);
+    setConfirmModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (selectedBookingId) {
+      handleDelete(selectedBookingId);
+    }
+    setConfirmModal(false);
+    setSelectedBookingId(null);
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4">
       <AccountNav />
-
       <h1 className="text-2xl font-bold mb-6 text-center">Your Bookings</h1>
 
       {bookings.length > 0 ? (
@@ -78,7 +92,7 @@ export default function BookingsPage() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleDelete(booking._id)}
+                      onClick={() => openConfirmModal(booking._id)}
                       className="flex items-center gap-1"
                     >
                       <Trash2 className="w-4 h-4" /> Cancel
@@ -93,7 +107,33 @@ export default function BookingsPage() {
         <p className="text-center text-gray-500 mt-10">No bookings yet.</p>
       )}
 
-      {/* Modal */}
+      {/* Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative">
+            <button
+              onClick={() => setConfirmModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-semibold mb-4 text-red-600">Cancel Booking?</h3>
+            <p className="text-gray-600">
+              Are you sure you want to cancel this booking? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-4">
+              <Button variant="outline" onClick={() => setConfirmModal(false)}>
+                No, Keep it
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete}>
+                Yes, Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative">

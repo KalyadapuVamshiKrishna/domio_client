@@ -15,7 +15,7 @@ export default function BookingPage() {
         setBooking(response.data);
       })
       .catch(() => {
-        setBooking(null); // optionally handle "not found"
+        setBooking(null); 
       });
   }
 }, [id]);

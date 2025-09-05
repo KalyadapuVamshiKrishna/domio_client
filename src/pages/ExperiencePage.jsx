@@ -7,15 +7,13 @@ export default function ExperiencesPage() {
 
   useEffect(() => {
     axios.get("/experiences").then((response) => {
-       console.log("API Response:", response.data);
+     
       setExperiences(response.data);
     });
   }, []);
 
   return (
-    <div className="mt-16 px-6 grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      
-        {console.log("Bookings:", experiences)}
+    <div className="mt-16 px-6 grid gap-6 grid-cols-1 sm:grid-cols-2 py-10 md:grid-cols-3 lg:grid-cols-4">     
 
        {experiences.map((exp) => (
           <Link
