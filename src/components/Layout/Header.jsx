@@ -18,6 +18,7 @@ export default function Header() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const isAuthenticated = !!user;
   const userRole = user?.role || "customer";
@@ -39,6 +40,7 @@ export default function Header() {
       guests,
     }).toString();
     navigate(`/?${params}`);
+    setSearchOpen(false);
   }
 
   async function handleLogout() {
@@ -58,6 +60,7 @@ export default function Header() {
   }, []);
 
   return (
+    <>
     <nav
       className={`fixed top-0 w-full z-50 transition-all ${
         isScrolled ? "bg-white shadow-md" : "bg-gray-50"
@@ -252,8 +255,91 @@ export default function Header() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <div className="flex md:hidden gap-2">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <Search className="w-6 h-6 text-gray-600" />
+            </button>
+          </div>
+
+          
         </div>
       </div>
     </nav>
+
+     {searchOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-white z-50 p-4"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Search</h2>
+            <button onClick={() => setSearchOpen(false)}>
+              <X className="w-6 h-6 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex flex-col gap-4">
+            <input
+              type="text"
+              placeholder="Where are you going?"
+              className="border p-3 rounded-lg"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+            />
+            <input
+              type="date"
+              className="border p-3 rounded-lg"
+              value={checkIn}
+              onChange={(e) => setCheckIn(e.target.value)}
+            />
+            <input
+              type="date"
+              className="border p-3 rounded-lg"
+              value={checkOut}
+              onChange={(e) => setCheckOut(e.target.value)}
+            />
+            <input
+              type="number"
+              min="1"
+              placeholder="Guests"
+              className="border p-3 rounded-lg"
+              value={guests}
+              onChange={(e) => setGuests(e.target.value)}
+            />
+            <button
+              onClick={handleSearch}
+              className="bg-rose-500 text-white py-3 rounded-lg"
+            >
+              Search
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Mobile: Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 w-full bg-white shadow-md flex justify-around py-2 md:hidden z-50">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.name}
+            to={tab.path}
+            className={`flex flex-col items-center text-xs ${
+              pathname === tab.path ? "text-rose-500" : "text-gray-500"
+            }`}
+          >
+            {tab.name}
+          </Link>
+        ))}
+        <Link
+          to={isAuthenticated ? "/account" : "/login"}
+          className="flex flex-col items-center text-xs"
+        >
+          Profile
+        </Link>
+      </div>
+      </>
   );
 }
