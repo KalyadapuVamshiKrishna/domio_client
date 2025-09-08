@@ -103,7 +103,7 @@ export default function Header() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
                   className="flex gap-6 mb-2 text-sm font-medium flex-wrap justify-center"
                 >
                   {tabs.map((tab) => (
@@ -129,15 +129,21 @@ export default function Header() {
                 borderRadius: isScrolled ? "9999px" : "2rem",
                 padding: isScrolled ? "0.4rem 1rem" : "0.8rem 1rem",
               }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
             >
               <AnimatePresence mode="wait">
                 {!isScrolled ? (
-                  <motion.div className="flex items-center gap-4 w-full min-w-0">
+                  <motion.div
+                    key="expanded"
+                    layout
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.4, ease: "easeInOut" }}
+                    className="flex items-center gap-4 w-full min-w-0"
+                  >
                     <div className="flex flex-col flex-grow min-w-[100px]">
-                      <label className="text-xs font-semibold mb-1">
-                        Where
-                      </label>
+                      <label className="text-xs font-semibold mb-1">Where</label>
                       <input
                         type="text"
                         placeholder="Search destinations"
@@ -148,9 +154,7 @@ export default function Header() {
                     </div>
                     <div className="border-l h-10 border-gray-300" />
                     <div className="flex flex-col flex-grow min-w-[90px]">
-                      <label className="text-xs font-semibold mb-1">
-                        Check in
-                      </label>
+                      <label className="text-xs font-semibold mb-1">Check in</label>
                       <input
                         type="date"
                         value={checkIn}
@@ -160,9 +164,7 @@ export default function Header() {
                     </div>
                     <div className="border-l h-10 border-gray-300" />
                     <div className="flex flex-col flex-grow min-w-[90px]">
-                      <label className="text-xs font-semibold mb-1">
-                        Check out
-                      </label>
+                      <label className="text-xs font-semibold mb-1">Check out</label>
                       <input
                         type="date"
                         value={checkOut}
@@ -190,10 +192,16 @@ export default function Header() {
                     </button>
                   </motion.div>
                 ) : (
-                  <div className="flex justify-between items-center text-gray-600 text-sm w-full px-4">
-                    <span className="cursor-pointer hover:underline">
-                      Anywhere
-                    </span>
+                  <motion.div
+                    key="collapsed"
+                    layout
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.1, ease: "easeInOut" }}
+                    className="flex justify-between items-center text-gray-600 text-sm w-full px-4"
+                  >
+                    <span className="cursor-pointer hover:underline">Anywhere</span>
                     <span>·</span>
                     <span>Any week</span>
                     <span>·</span>
@@ -204,7 +212,7 @@ export default function Header() {
                     >
                       <Search className="w-4 h-4" />
                     </button>
-                  </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </motion.div>

@@ -1,126 +1,287 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
+import axios from "axios";
 import Image from "../Image.jsx";
-import { Heart, Star } from "lucide-react"; // ✅ Added Star icon
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Heart, Star, Filter } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+/**
+ * Redesigned IndexPage (Explore Stays)
+ *
+ * Mobile-first, responsive, polished UX.
+ *
+ * Notes:
+ * - Adjust API endpoints and data shape if needed.
+ * - Ensure Tailwind is configured; tweak colors to match your design system.
+ */
+
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center py-6">
+      <svg
+        className="animate-spin h-6 w-6 text-rose-500"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        aria-hidden
+      >
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+      </svg>
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div aria-hidden className="animate-pulse">
+      <div className="bg-gray-200 rounded-2xl overflow-hidden h-56 mb-3" />
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+      <div className="h-3 bg-gray-200 rounded w-1/2" />
+    </div>
+  );
+}
 
 export default function IndexPage() {
   const [places, setPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false); // for infinite scroll loads
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  const [searchParams] = useSearchParams();
+  const queryLocation = searchParams.get("location") || "";
+  const queryCheckIn = searchParams.get("checkIn") || "";
+  const queryCheckOut = searchParams.get("checkOut") || "";
+  const queryGuests = searchParams.get("guests") || "";
+  const querySort = searchParams.get("sortBy") || "";
+
+  // local UI state
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState(new Set()); // optimistic wishlist
   const observerRef = useRef(null);
+  const listEndRef = useRef(null);
   const limit = 12;
 
-  const [searchParams] = useSearchParams();
-  const location = searchParams.get("location") || "";
-  const checkIn = searchParams.get("checkIn") || "";
-  const checkOut = searchParams.get("checkOut") || "";
-  const guests = searchParams.get("guests") || "";
-  const sortBy = searchParams.get("sortBy") || "";
+  // local filter UI (demo: priceMin / priceMax)
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
 
-  const fetchPlaces = async (isLoadMore = false) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axios.get(`/places`, {
-        params: { location, checkIn, checkOut, guests, sortBy, page, limit },
-      });
-
-      const fetchedPlaces = Array.isArray(res.data.places)
-        ? res.data.places
-        : [];
-
-      if (isLoadMore) {
-        setPlaces((prev) => [...prev, ...fetchedPlaces]);
+  // Fetch function (page-aware)
+  const fetchPlaces = useCallback(
+    async (pageToFetch = 1, append = false) => {
+      if (pageToFetch === 1) {
+        setLoading(true);
+        setError(null);
       } else {
-        setPlaces(fetchedPlaces);
+        setPageLoading(true);
       }
 
-      setHasMore(fetchedPlaces.length >= limit);
-    } catch (err) {
-      console.error("Failed to fetch places:", err);
-      setError("Unable to load listings. Please try again later.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const res = await axios.get("/places", {
+          params: {
+            location: queryLocation,
+            checkIn: queryCheckIn,
+            checkOut: queryCheckOut,
+            guests: queryGuests,
+            sortBy: querySort,
+            page: pageToFetch,
+            limit,
+            priceMin: priceMin || undefined,
+            priceMax: priceMax || undefined,
+          },
+        });
 
+        const fetchedPlaces = Array.isArray(res.data.places) ? res.data.places : [];
+
+        setPlaces((prev) => (append ? [...prev, ...fetchedPlaces] : fetchedPlaces));
+
+        setHasMore(fetchedPlaces.length >= limit);
+
+        // populate favorites set if API returns wishlist info
+        if (pageToFetch === 1 && res.data.wishlistIds) {
+          try {
+            setFavoriteIds(new Set(res.data.wishlistIds));
+          } catch {}
+        }
+      } catch (err) {
+        console.error("Failed to fetch places:", err);
+        setError("Unable to load listings. Please try again later.");
+      } finally {
+        setLoading(false);
+        setPageLoading(false);
+      }
+    },
+    [queryLocation, queryCheckIn, queryCheckOut, queryGuests, querySort, priceMin, priceMax]
+  );
+
+  // initial + filter changes reset page
   useEffect(() => {
     setPage(1);
-    fetchPlaces(false);
-  }, [location, checkIn, checkOut, guests, sortBy]);
+    fetchPlaces(1, false);
+  }, [fetchPlaces]);
 
+  // load more when page increments
   useEffect(() => {
-    if (page > 1) {
-      fetchPlaces(true);
-    }
-  }, [page]);
+    if (page === 1) return;
+    fetchPlaces(page, true);
+  }, [page, fetchPlaces]);
 
+  // Intersection observer for infinite scroll
   const lastPlaceRef = useCallback(
     (node) => {
-      if (loading) return;
+      if (pageLoading || loading) return;
       if (observerRef.current) observerRef.current.disconnect();
 
       observerRef.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && hasMore) {
           setPage((prev) => prev + 1);
         }
-      });
+      }, { rootMargin: "200px" });
 
       if (node) observerRef.current.observe(node);
     },
-    [loading, hasMore]
+    [pageLoading, loading, hasMore]
   );
 
-  /** Loading State */
+  // wishlist toggle (optimistic)
+  const toggleFavorite = async (placeId) => {
+    // optimistic update
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(placeId)) next.delete(placeId);
+      else next.add(placeId);
+      return next;
+    });
+
+    try {
+      await axios.post(`/places/${placeId}/toggle-wishlist`);
+      // server response not used; we keep optimistic
+    } catch (err) {
+      console.error("Wishlist toggle failed:", err);
+      // rollback on failure (simple rollback strategy)
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(placeId)) next.delete(placeId);
+        else next.add(placeId);
+        return next;
+      });
+    }
+  };
+
+  // helper: format price
+  const formatPrice = (p) => {
+    if (p == null) return "N/A";
+    // assume p is number (₹)
+    return `₹${p.toLocaleString("en-IN")}`;
+  };
+
+  // UI-level: apply filters
+  const applyFilters = () => {
+    setFiltersOpen(false);
+    setPage(1);
+    fetchPlaces(1, false);
+  };
+
+  // render states
   if (loading && places.length === 0) {
+    // mobile-first skeleton grid
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mt-16 px-4">
-        {[...Array(8)].map((_, i) => (
-          <Skeleton key={i} className="h-80 w-full rounded-xl" />
-        ))}
+      <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Explore stays</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFiltersOpen(true)}
+              aria-label="Open filters"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border hover:shadow-sm"
+            >
+              <Filter className="w-4 h-4" />
+              <span className="text-sm">Filters</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl p-2">
+              <SkeletonCard  className="rounded-2xl"/>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  /** Error State */
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-[50vh] text-red-600 text-lg font-medium">
-        {error}
+      <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto text-center">
+        <h2 className="text-xl font-semibold text-rose-600 mb-4">Something went wrong</h2>
+        <p className="text-gray-600 mb-6">{error}</p>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={() => fetchPlaces(1, false)}
+            className="px-4 py-2 bg-rose-500 text-white rounded-full"
+          >
+            Retry
+          </button>
+          <Link to="/" className="px-4 py-2 rounded-full border">
+            Back home
+          </Link>
+        </div>
       </div>
     );
   }
 
-  /** Empty State */
   if (!places.length) {
     return (
-      <div className="flex justify-center items-center min-h-[50vh] text-gray-500 text-lg">
-        No listings found for "{location || 'all locations'}".
+      <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
+        <div className="w-full max-w-sm mx-auto">
+          <svg viewBox="0 0 64 64" className="mx-auto mb-6 h-28 w-28 text-gray-200" fill="none" aria-hidden>
+            <rect x="2" y="10" width="60" height="36" rx="6" stroke="currentColor" strokeWidth="2" />
+            <path d="M8 22h48" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="20" cy="30" r="2" fill="currentColor" />
+            <circle cx="28" cy="30" r="2" fill="currentColor" />
+            <circle cx="36" cy="30" r="2" fill="currentColor" />
+          </svg>
+          <h3 className="text-lg font-semibold mb-2">No stays found</h3>
+          <p className="text-gray-600 mb-6">Try changing filters or clearing your search.</p>
+          <div className="flex justify-center gap-3">
+            <button onClick={() => { setPriceMin(""); setPriceMax(""); setPage(1); fetchPlaces(1, false); }} className="px-4 py-2 rounded-full border">
+              Clear filters
+            </button>
+            <button onClick={() => setFiltersOpen(true)} className="px-4 py-2 rounded-full bg-rose-500 text-white">
+              Show filters
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-12">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-6">
-        Explore Stays
-      </h1>
+    <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-8">
+      {/* Header + filter button */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800">Explore stays</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFiltersOpen(true)}
+            aria-label="Open filters"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full border hover:shadow-sm"
+          >
+            <Filter className="w-4 h-4" />
+            <span className="hidden sm:inline text-sm">Filters</span>
+          </button>
+        </div>
+      </div>
 
-      <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      {/* Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {places.map((place, index) => {
           const isLastItem = index === places.length - 1;
+          const favorited = favoriteIds.has(place._id);
           return (
             <Link
               key={place._id}
@@ -128,63 +289,155 @@ export default function IndexPage() {
               className="group block"
               ref={isLastItem ? lastPlaceRef : null}
             >
-              <Card className="overflow-hidden rounded-2xl shadow-sm hover:shadow-lg transition duration-300 relative">
-                {/* Wishlist Icon */}
-                <button className="absolute top-4 right-4 bg-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition shadow-md hover:scale-110">
-                  <Heart size={18} className="text-gray-700 hover:text-red-500" />
-                </button>
+              <motion.article
+                layout
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.28 }}
+                className="bg-white/40 backdrop-blur-md rounded-2xl shadow-sm hover:shadow-lg transition-transform transform hover:-translate-y-1 overflow-hidden"
 
-                {/* Image */}
-                <div className="relative w-full h-56 bg-gray-100">
+                aria-labelledby={`place-title-${place._id}`}
+              >
+                <div className="relative w-full h-56 bg-transperant">
+                  {/* Image (lazy + cover) */}
                   {place.photos?.[0] ? (
                     <Image
-                      className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       src={place.photos[0]}
-                      alt={place.title || "Place"}
+                      alt={place.title || "Place image"}
+                      className="object-cover w-full h-full rounded-3xl transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                      No Image Available
+                    <div className="flex items-center justify-center h-full text-transperant">
+                      No image
                     </div>
                   )}
-                </div>
 
-                <CardContent className="p-4">
-                  <CardHeader className="p-0 mb-2">
-                    <CardTitle className="text-base font-semibold truncate">
-                      {place.title || "Untitled"}
-                    </CardTitle>
-                    <CardDescription className="text-sm text-gray-500 truncate">
-                      {place.address || "Unknown address"}
-                    </CardDescription>
-                  </CardHeader>
+                  {/* Top-right wishlist */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault(); // stop link navigation
+                      e.stopPropagation();
+                      toggleFavorite(place._id);
+                    }}
+                    aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
+                    className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-sm hover:scale-105 transform transition"
+                  >
+                    <Heart
+                      size={18}
+                      className={`transition-colors ${favorited ? "text-rose-500" : "text-gray-600"}`}
+                    />
+                  </button>
 
-                  <div className="flex justify-between items-center mt-2">
-                    <div className="text-lg font-bold text-gray-900">
-                      ${place.price ?? "N/A"}
-                      <span className="text-gray-500 text-sm font-normal">
-                        {" "}
-                        / night
-                      </span>
-                    </div>
-                    <div className="flex items-center text-gray-600 text-sm gap-1">
-                      <Star size={16} className="text-yellow-500 fill-yellow-500" /> {/* ✅ Icon */}
-                      {place.rating ? place.rating.toFixed(1) : "4.8"}
+                  {/* bottom gradient + title overlay */}
+                  <div className="absolute left-0 right-0 bottom-0">
+                    <div className="bg-gradient-to-t from-transperant via-black/20 to-transparent px-4 py-3">
+                      <h3 id={`place-title-${place._id}`} className="text-white text-sm font-semibold truncate">
+                        {place.title || "Untitled"}
+                      </h3>
+                      <p className="text-xs text-gray-200 truncate mt-1">{place.address || "Unknown address"}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                <div className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{formatPrice(place.price)}</div>
+                      <div className="text-xs text-gray-500">per night</div>
+                    </div>
+
+                    <div className="inline-flex items-center gap-1 bg-transperant px-2 py-1 rounded-full">
+                      <Star size={14} className="text-yellow-500" />
+                      <span className="text-sm text-gray-700">{place.rating ? place.rating.toFixed(1) : "4.8"}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.article>
             </Link>
           );
         })}
       </div>
 
-      {/* Loading More Indicator */}
-      {loading && places.length > 0 && (
-        <div className="text-center mt-6 text-gray-500 text-sm">
-          Loading more listings...
-        </div>
-      )}
+      {/* bottom loader */}
+      <div ref={listEndRef}>
+        {(pageLoading || loading) && <Spinner />}
+        {!hasMore && (
+          <div className="text-center text-gray-500 py-6">You've reached the end of the list.</div>
+        )}
+      </div>
+
+      {/* Filters drawer (simple) */}
+      <AnimatePresence>
+        {filtersOpen && (
+          <motion.aside
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-50"
+            aria-modal="true"
+          >
+            {/* Backdrop */}
+            <div
+              onClick={() => setFiltersOpen(false)}
+              className="absolute inset-0 bg-black/40"
+            />
+
+            {/* Drawer panel (bottom sheet on mobile, side panel on md+) */}
+            <div className="absolute left-0 right-0 bottom-0 md:top-0 md:right-0 md:left-auto md:w-[380px] bg-white rounded-t-2xl md:rounded-l-2xl p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold">Filters</h4>
+                <button onClick={() => setFiltersOpen(false)} className="px-2 py-1 rounded-full border">Close</button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-gray-700 block mb-1">Price range (min)</label>
+                  <input
+                    type="number"
+                    value={priceMin}
+                    onChange={(e) => setPriceMin(e.target.value)}
+                    placeholder="e.g. 1000"
+                    className="w-full border rounded px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-700 block mb-1">Price range (max)</label>
+                  <input
+                    type="number"
+                    value={priceMax}
+                    onChange={(e) => setPriceMax(e.target.value)}
+                    placeholder="e.g. 8000"
+                    className="w-full border rounded px-3 py-2"
+                  />
+                </div>
+
+                {/* Placeholder for more filters: amenities, rooms, instant book */}
+                <div>
+                  <label className="text-sm text-gray-700 block mb-2">More filters</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button className="border rounded px-2 py-1 text-sm">Wi-Fi</button>
+                    <button className="border rounded px-2 py-1 text-sm">Kitchen</button>
+                    <button className="border rounded px-2 py-1 text-sm">Air con</button>
+                    <button className="border rounded px-2 py-1 text-sm">Washer</button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button onClick={applyFilters} className="flex-1 bg-rose-500 text-white py-2 rounded-full">
+                    Apply filters
+                  </button>
+                  <button onClick={() => { setPriceMin(""); setPriceMax(""); }} className="px-4 py-2 rounded-full border">
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

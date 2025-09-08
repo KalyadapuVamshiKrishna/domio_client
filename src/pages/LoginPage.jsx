@@ -1,7 +1,7 @@
-import {Link, Navigate} from "react-router-dom";
-import {useContext, useState} from "react";
+import { Link, Navigate } from "react-router-dom";
+import { useContext, useState } from "react";
 import axios from "axios";
-import {UserContext} from "../Context/UserContext.jsx";
+import { UserContext } from "../Context/UserContext.jsx";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -10,14 +10,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [redirect, setRedirect] = useState(false);
-  const {setUser} = useContext(UserContext);
+  const { setUser } = useContext(UserContext);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   async function handleLoginSubmit(ev) {
     ev.preventDefault();
     setLoading(true);
     try {
-      const {data} = await axios.post('/login', {email,password});
+      const { data } = await axios.post('/login', { email, password });
       setUser(data);
       setRedirect(true);
     } catch (e) {
@@ -27,7 +28,24 @@ export default function LoginPage() {
     }
   }
 
-  if (redirect) return <Navigate to={'/'} />;
+  async function handleGuestLogin() {
+    setGuestLoading(true);
+    try {
+      const guestCredentials = {
+        email: "host1@gmail.com",
+        password: "rem"
+      };
+      const { data } = await axios.post('/login', guestCredentials);
+      setUser(data);
+      setRedirect(true);
+    } catch (e) {
+      alert('Guest login failed. Please try again.');
+    } finally {
+      setGuestLoading(false);
+    }
+  }
+
+  if (redirect) return <Navigate to="/" />;
 
   return (
     <div className="flex grow items-center justify-center min-h-[80vh] px-4">
@@ -40,7 +58,7 @@ export default function LoginPage() {
               type="email"
               placeholder="your@email.com"
               value={email}
-              onChange={ev => setEmail(ev.target.value)}
+              onChange={(ev) => setEmail(ev.target.value)}
               required
             />
           </div>
@@ -50,7 +68,7 @@ export default function LoginPage() {
               type="password"
               placeholder="password"
               value={password}
-              onChange={ev => setPassword(ev.target.value)}
+              onChange={(ev) => setPassword(ev.target.value)}
               required
             />
           </div>
@@ -58,6 +76,19 @@ export default function LoginPage() {
             {loading ? "Logging in..." : "Login"}
           </Button>
         </form>
+
+        {/* ✅ Guest Login Button */}
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleGuestLogin}
+            disabled={guestLoading}
+          >
+            {guestLoading ? "Logging in as Guest..." : "Login as Guest"}
+          </Button>
+        </div>
+
         <div className="text-center text-sm text-gray-500 mt-4">
           Don't have an account?{' '}
           <Link to="/register" className="underline text-black font-medium">

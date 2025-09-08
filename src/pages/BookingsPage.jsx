@@ -49,33 +49,46 @@ export default function BookingsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4">
+    <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16 py-8">
       <AccountNav />
-      <h1 className="text-2xl font-bold mb-6 text-center">Your Bookings</h1>
+
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+          Your Bookings
+        </h1>
+      </div>
 
       {bookings.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {bookings.map((booking) => {
             const location =
-              booking.address || (booking.place ? booking.place.address : "Location not available");
+              booking.address ||
+              (booking.place ? booking.place.address : "Location not available");
 
             return (
               <Card
                 key={booking._id}
-                className="flex flex-col shadow-md hover:shadow-xl transition rounded-xl overflow-hidden"
+                className="flex flex-col rounded-xl overflow-hidden shadow hover:shadow-lg transition"
               >
+                {/* Image */}
                 {booking.place ? (
-                  <PlaceImg place={booking.place} className="h-48 w-full object-cover" />
+                  <PlaceImg
+                    place={booking.place}
+                    className="h-48 w-full object-cover"
+                  />
                 ) : (
                   <div className="h-48 w-full bg-gray-200 flex items-center justify-center text-gray-500">
                     No Image Available
                   </div>
                 )}
 
+                {/* Card Content */}
                 <CardContent className="p-4 flex flex-col justify-between flex-1">
                   {booking.place ? (
                     <>
-                      <h2 className="text-lg font-semibold mb-2 truncate">{booking.place.title}</h2>
+                      <h2 className="text-lg font-semibold mb-2 truncate">
+                        {booking.place.title}
+                      </h2>
                       <p className="text-gray-600 flex items-center gap-1 mb-3">
                         <MapPin className="w-4 h-4 text-gray-500" />
                         {location}
@@ -85,10 +98,15 @@ export default function BookingsPage() {
                     <p className="text-gray-500 mb-3">{location}</p>
                   )}
 
-                  <BookingDates booking={booking} className="text-sm text-gray-500 mb-3" />
+                  <BookingDates
+                    booking={booking}
+                    className="text-sm text-gray-500 mb-3"
+                  />
 
                   <div className="flex items-center justify-between mt-3">
-                    <p className="text-lg font-semibold text-primary">₹{booking.price}</p>
+                    <p className="text-lg font-semibold text-rose-500">
+                      ₹{booking.price}
+                    </p>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -104,22 +122,32 @@ export default function BookingsPage() {
           })}
         </div>
       ) : (
-        <p className="text-center text-gray-500 mt-10">No bookings yet.</p>
+        <div className="text-center mt-12">
+          <p className="text-gray-500 text-lg mb-4">No bookings yet.</p>
+          <Button asChild>
+            <a href="/" className="bg-rose-500 text-white hover:bg-rose-600">
+              Browse Listings
+            </a>
+          </Button>
+        </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* ✅ Confirmation Modal */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative animate-fadeIn">
             <button
               onClick={() => setConfirmModal(false)}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-semibold mb-4 text-red-600">Cancel Booking?</h3>
+            <h3 className="text-lg font-semibold mb-4 text-red-600">
+              Cancel Booking?
+            </h3>
             <p className="text-gray-600">
-              Are you sure you want to cancel this booking? This action cannot be undone.
+              Are you sure you want to cancel this booking? This action cannot
+              be undone.
             </p>
             <div className="mt-6 flex justify-end gap-4">
               <Button variant="outline" onClick={() => setConfirmModal(false)}>
@@ -133,17 +161,19 @@ export default function BookingsPage() {
         </div>
       )}
 
-      {/* Success Modal */}
+      {/* ✅ Success Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative animate-fadeIn">
             <button
               onClick={() => setShowModal(false)}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-semibold mb-4">Booking Canceled</h3>
+            <h3 className="text-lg font-semibold mb-4 text-green-600">
+              Booking Canceled
+            </h3>
             <p className="text-gray-600">{modalMessage}</p>
             <div className="mt-6 flex justify-end">
               <Button onClick={() => setShowModal(false)}>Close</Button>

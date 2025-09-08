@@ -12,13 +12,18 @@ export default function PlacesPage() {
   }, []);
 
   return (
-    <div className="px-4 md:px-8 lg:px-16 py-6">
+    <div className="px-4 md:px-8 lg:px-16 py-8">
+      {/* ✅ Account Navigation */}
       <AccountNav />
 
-      <div className="flex justify-center my-6">
+      {/* ✅ Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 my-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          Your Places
+        </h1>
         <Link
           to="/account/places/new"
-          className="inline-flex items-center gap-2 bg-primary text-white font-semibold py-2 px-6 rounded-full shadow hover:bg-primary/80 transition"
+          className="inline-flex items-center gap-2 bg-rose-500 text-white font-semibold py-2 px-6 rounded-full shadow hover:bg-rose-600 transition-all duration-200"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -32,35 +37,60 @@ export default function PlacesPage() {
               clipRule="evenodd"
             />
           </svg>
-          Add new place
+          Add New Place
         </Link>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {places.length > 0 &&
-          places.map((place) => (
+      {/* ✅ Places Grid */}
+      {places.length > 0 ? (
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {places.map((place) => (
             <Link
               key={place._id}
               to={`/account/places/${place._id}`}
-              className="group relative flex flex-col bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition"
+              className="group flex flex-col"
             >
-              <div className="relative w-full h-48 bg-gray-200">
-                <PlaceImg place={place} />
-                <div className="absolute bottom-2 left-2 bg-black/50 text-white text-sm px-2 py-1 rounded-md">
-                  {place.title}
-                </div>
+              {/* Image Section */}
+              <div className="relative w-full h-56 overflow-hidden rounded-xl">
+                <PlaceImg
+                  place={place}
+                  className="w-full h-full object-cover transform group-hover:scale-105 transition duration-300"
+                />
+                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition"></div>
               </div>
-              <div className="p-4 flex flex-col gap-2">
-                <p className="text-gray-600 text-sm line-clamp-3">{place.description}</p>
+
+              {/* Details Section */}
+              <div className="mt-3 flex flex-col gap-1">
+                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  {place.title}
+                </h3>
+                <p className="text-gray-600 text-sm line-clamp-2">
+                  {place.description}
+                </p>
+                {/* Optional: Price & Rating */}
+                {place.price && (
+                  <p className="mt-1 text-gray-800 font-semibold">
+                    ₹{place.price}{" "}
+                    <span className="text-gray-500 text-sm">/ night</span>
+                  </p>
+                )}
               </div>
             </Link>
           ))}
-      </div>
-
-      {places.length === 0 && (
-        <p className="text-center text-gray-500 mt-10">
-          You don’t have any places yet. Start by adding a new place.
-        </p>
+        </div>
+      ) : (
+        /* ✅ Empty State */
+        <div className="text-center mt-16">
+          <p className="text-gray-500 text-lg mb-4">
+            You don’t have any places yet.
+          </p>
+          <Link
+            to="/account/places/new"
+            className="bg-rose-500 text-white font-semibold py-2 px-6 rounded-full shadow hover:bg-rose-600 transition"
+          >
+            Add Your First Place
+          </Link>
+        </div>
       )}
     </div>
   );
