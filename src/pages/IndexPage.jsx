@@ -1,20 +1,31 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useContext } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import Image from "../Image.jsx";
 import { Heart, Star, Filter } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { UserContext } from "../Context/UserContext.jsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 
-/**
- * Redesigned IndexPage (Explore Stays)
- *
- * Mobile-first, responsive, polished UX.
- *
- * Notes:
- * - Adjust API endpoints and data shape if needed.
- * - Ensure Tailwind is configured; tweak colors to match your design system.
- */
+// ✅ Always send cookies (JWT session / auth cookies)
+axios.defaults.withCredentials = true;
 
+// 🔄 Spinner
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-6">
@@ -23,54 +34,63 @@ function Spinner() {
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
-        aria-hidden
       >
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
       </svg>
     </div>
   );
 }
 
+// 🔄 Skeleton shimmer
 function SkeletonCard() {
   return (
-    <div aria-hidden className="animate-pulse">
-      <div className="bg-gray-200 rounded-2xl overflow-hidden h-56 mb-3" />
-      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-      <div className="h-3 bg-gray-200 rounded w-1/2" />
+    <div className="animate-pulse rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm shadow-sm">
+      <div className="bg-gray-200 h-56 w-full" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-200 rounded w-1/2" />
+      </div>
     </div>
   );
 }
 
 export default function IndexPage() {
+  const { user } = useContext(UserContext);
+
   const [places, setPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pageLoading, setPageLoading] = useState(false); // for infinite scroll loads
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("newest");
+
+  const [priceRange, setPriceRange] = useState([1000, 8000]);
+  const listEndRef = useRef(null);
+  const fetchingRef = useRef(false);
+  const limit = 12;
 
   const [searchParams] = useSearchParams();
   const queryLocation = searchParams.get("location") || "";
   const queryCheckIn = searchParams.get("checkIn") || "";
   const queryCheckOut = searchParams.get("checkOut") || "";
   const queryGuests = searchParams.get("guests") || "";
-  const querySort = searchParams.get("sortBy") || "";
 
-  // local UI state
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [favoriteIds, setFavoriteIds] = useState(new Set()); // optimistic wishlist
-  const observerRef = useRef(null);
-  const listEndRef = useRef(null);
-  const limit = 12;
-
-  // local filter UI (demo: priceMin / priceMax)
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
-
-  // Fetch function (page-aware)
+  // 🔄 Fetch places function
   const fetchPlaces = useCallback(
     async (pageToFetch = 1, append = false) => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+
       if (pageToFetch === 1) {
         setLoading(true);
         setError(null);
@@ -85,129 +105,114 @@ export default function IndexPage() {
             checkIn: queryCheckIn,
             checkOut: queryCheckOut,
             guests: queryGuests,
-            sortBy: querySort,
+            sortBy,
             page: pageToFetch,
             limit,
-            priceMin: priceMin || undefined,
-            priceMax: priceMax || undefined,
+            priceMin: priceRange[0],
+            priceMax: priceRange[1],
           },
+          withCredentials: true,
         });
+       
 
         const fetchedPlaces = Array.isArray(res.data.places) ? res.data.places : [];
 
-        setPlaces((prev) => (append ? [...prev, ...fetchedPlaces] : fetchedPlaces));
-
+        const enrichedPlaces = fetchedPlaces.map((p) => ({
+          ...p,
+          isFavorite: user?.wishlist?.includes(p._id.toString()) ?? false,
+        }));
+        setPlaces((prev) => (append ? [...prev, ...enrichedPlaces] : enrichedPlaces));
         setHasMore(fetchedPlaces.length >= limit);
-
-        // populate favorites set if API returns wishlist info
-        if (pageToFetch === 1 && res.data.wishlistIds) {
-          try {
-            setFavoriteIds(new Set(res.data.wishlistIds));
-          } catch {}
-        }
       } catch (err) {
         console.error("Failed to fetch places:", err);
         setError("Unable to load listings. Please try again later.");
       } finally {
+        fetchingRef.current = false;
         setLoading(false);
         setPageLoading(false);
       }
     },
-    [queryLocation, queryCheckIn, queryCheckOut, queryGuests, querySort, priceMin, priceMax]
+    [queryLocation, queryCheckIn, queryCheckOut, queryGuests, sortBy, priceRange]
   );
 
-  // initial + filter changes reset page
+  const markWishlist = (wishlist) => {
+    const wishlistSet = new Set(wishlist.map((id) => id.toString()));
+    setPlaces((prev) =>
+      prev.map((p) => ({ ...p, isFavorite: wishlistSet.has(p._id.toString()) }))
+    );
+  };
+
+  useEffect(() => {
+    if (!user) return; // no user, nothing to do
+  
+    if (user.wishlist?.length) {
+      markWishlist(user.wishlist); // mark isFavorite for existing places
+    }
+  }, [user]);
+  
+
+  // 🔄 Initial fetch & fetch when filters change
   useEffect(() => {
     setPage(1);
     fetchPlaces(1, false);
   }, [fetchPlaces]);
 
-  // load more when page increments
+  // 🔄 Fetch next page
   useEffect(() => {
     if (page === 1) return;
     fetchPlaces(page, true);
   }, [page, fetchPlaces]);
 
-  // Intersection observer for infinite scroll
-  const lastPlaceRef = useCallback(
-    (node) => {
-      if (pageLoading || loading) return;
-      if (observerRef.current) observerRef.current.disconnect();
+  // 🔄 Infinite scroll
+  useEffect(() => {
+    if (pageLoading || loading) return;
+    if (!hasMore) return;
 
-      observerRef.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
           setPage((prev) => prev + 1);
         }
-      }, { rootMargin: "200px" });
+      },
+      { rootMargin: "200px" }
+    );
 
-      if (node) observerRef.current.observe(node);
-    },
-    [pageLoading, loading, hasMore]
-  );
+    if (listEndRef.current) observer.observe(listEndRef.current);
 
-  // wishlist toggle (optimistic)
+    return () => {
+      if (listEndRef.current) observer.unobserve(listEndRef.current);
+    };
+  }, [pageLoading, loading, hasMore]);
+
+  // ✅ Wishlist toggle (login required)
   const toggleFavorite = async (placeId) => {
-    // optimistic update
-    setFavoriteIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(placeId)) next.delete(placeId);
-      else next.add(placeId);
-      return next;
-    });
+    if (!user) {
+      alert("Please login to add to wishlist");
+      return;
+    }
 
     try {
-      await axios.post(`/places/${placeId}/toggle-wishlist`);
-      // server response not used; we keep optimistic
+      const res = await axios.post(`/places/${placeId}/toggle-wishlist`, {}, { withCredentials: true });
+      const { isFavorite } = res.data;
+      
+
+      setPlaces((prev) =>
+        prev.map((p) => (p._id === placeId ? { ...p, isFavorite } : p))
+      );
     } catch (err) {
       console.error("Wishlist toggle failed:", err);
-      // rollback on failure (simple rollback strategy)
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(placeId)) next.delete(placeId);
-        else next.add(placeId);
-        return next;
-      });
     }
   };
 
-  // helper: format price
-  const formatPrice = (p) => {
-    if (p == null) return "N/A";
-    // assume p is number (₹)
-    return `₹${p.toLocaleString("en-IN")}`;
-  };
+  const formatPrice = (p) => (p == null ? "N/A" : `₹${p.toLocaleString("en-IN")}`);
 
-  // UI-level: apply filters
-  const applyFilters = () => {
-    setFiltersOpen(false);
-    setPage(1);
-    fetchPlaces(1, false);
-  };
-
-  // render states
+  // 🔄 UI
   if (loading && places.length === 0) {
-    // mobile-first skeleton grid
     return (
-      <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">Explore stays</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setFiltersOpen(true)}
-              aria-label="Open filters"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border hover:shadow-sm"
-            >
-              <Filter className="w-4 h-4" />
-              <span className="text-sm">Filters</span>
-            </button>
-          </div>
-        </div>
-
+      <div className="mt-20 max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl p-2">
-              <SkeletonCard  className="rounded-2xl"/>
-            </div>
+            <SkeletonCard key={i} />
           ))}
         </div>
       </div>
@@ -216,228 +221,164 @@ export default function IndexPage() {
 
   if (error) {
     return (
-      <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto text-center">
-        <h2 className="text-xl font-semibold text-rose-600 mb-4">Something went wrong</h2>
-        <p className="text-gray-600 mb-6">{error}</p>
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={() => fetchPlaces(1, false)}
-            className="px-4 py-2 bg-rose-500 text-white rounded-full"
-          >
-            Retry
-          </button>
-          <Link to="/" className="px-4 py-2 rounded-full border">
-            Back home
-          </Link>
-        </div>
+      <div className="mt-20 text-center text-gray-700">
+        <h2 className="text-2xl font-semibold text-rose-500 mb-3">
+          Oops, something went wrong!
+        </h2>
+        <p className="mb-6">{error}</p>
+        <Button onClick={() => fetchPlaces(1, false)}>Retry</Button>
       </div>
     );
   }
 
   if (!places.length) {
     return (
-      <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
-        <div className="w-full max-w-sm mx-auto">
-          <svg viewBox="0 0 64 64" className="mx-auto mb-6 h-28 w-28 text-gray-200" fill="none" aria-hidden>
-            <rect x="2" y="10" width="60" height="36" rx="6" stroke="currentColor" strokeWidth="2" />
-            <path d="M8 22h48" stroke="currentColor" strokeWidth="1.5" />
-            <circle cx="20" cy="30" r="2" fill="currentColor" />
-            <circle cx="28" cy="30" r="2" fill="currentColor" />
-            <circle cx="36" cy="30" r="2" fill="currentColor" />
-          </svg>
-          <h3 className="text-lg font-semibold mb-2">No stays found</h3>
-          <p className="text-gray-600 mb-6">Try changing filters or clearing your search.</p>
-          <div className="flex justify-center gap-3">
-            <button onClick={() => { setPriceMin(""); setPriceMax(""); setPage(1); fetchPlaces(1, false); }} className="px-4 py-2 rounded-full border">
-              Clear filters
-            </button>
-            <button onClick={() => setFiltersOpen(true)} className="px-4 py-2 rounded-full bg-rose-500 text-white">
-              Show filters
-            </button>
-          </div>
-        </div>
+      <div className="mt-20 text-center text-gray-700">
+        <h3 className="text-xl font-semibold mb-2">No stays found</h3>
+        <p className="text-gray-500 mb-6">
+          Try changing filters or clearing your search.
+        </p>
+        <Button onClick={() => fetchPlaces(1, false)}>Clear filters</Button>
       </div>
     );
   }
 
   return (
-    <div className="mt-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-8">
-      {/* Header + filter button */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800">Explore stays</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setFiltersOpen(true)}
-            aria-label="Open filters"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-full border hover:shadow-sm"
-          >
-            <Filter className="w-4 h-4" />
-            <span className="hidden sm:inline text-sm">Filters</span>
-          </button>
-        </div>
+    <div className="mt-20 max-w-7xl mx-auto px-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold">Explore stays</h1>
+        <Button
+          variant="outline"
+          className="flex items-center gap-2"
+          onClick={() => setFiltersOpen(true)}
+        >
+          <Filter className="w-4 h-4" />
+          Filters
+        </Button>
       </div>
 
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {places.map((place, index) => {
-          const isLastItem = index === places.length - 1;
-          const favorited = favoriteIds.has(place._id);
-          return (
-            <Link
-              key={place._id}
-              to={`/place/${place._id}`}
-              className="group block"
-              ref={isLastItem ? lastPlaceRef : null}
-            >
-              <motion.article
-                layout
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.28 }}
-                className="bg-white/40 backdrop-blur-md rounded-2xl shadow-sm hover:shadow-lg transition-transform transform hover:-translate-y-1 overflow-hidden"
-
-                aria-labelledby={`place-title-${place._id}`}
-              >
-                <div className="relative w-full h-56 bg-transperant">
-                  {/* Image (lazy + cover) */}
-                  {place.photos?.[0] ? (
-                    <Image
-                      src={place.photos[0]}
-                      alt={place.title || "Place image"}
-                      className="object-cover w-full h-full rounded-3xl transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-transperant">
-                      No image
-                    </div>
-                  )}
-
-                  {/* Top-right wishlist */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault(); // stop link navigation
-                      e.stopPropagation();
-                      toggleFavorite(place._id);
-                    }}
-                    aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
-                    className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-sm hover:scale-105 transform transition"
-                  >
-                    <Heart
-                      size={18}
-                      className={`transition-colors ${favorited ? "text-rose-500" : "text-gray-600"}`}
-                    />
-                  </button>
-
-                  {/* bottom gradient + title overlay */}
-                  <div className="absolute left-0 right-0 bottom-0">
-                    <div className="bg-gradient-to-t from-transperant via-black/20 to-transparent px-4 py-3">
-                      <h3 id={`place-title-${place._id}`} className="text-white text-sm font-semibold truncate">
-                        {place.title || "Untitled"}
-                      </h3>
-                      <p className="text-xs text-gray-200 truncate mt-1">{place.address || "Unknown address"}</p>
-                    </div>
+        {places.map((place) => (
+          <motion.div
+            key={place._id}
+            layout
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="group relative bg-white/50 backdrop-blur-md rounded-2xl shadow-sm hover:shadow-lg overflow-hidden transition"
+          >
+            <Link to={`/place/${place._id}`} className="block">
+              <div className="relative">
+                <Image
+                  src={place.photos?.[0]}
+                  alt={place.title}
+                  className="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleFavorite(place._id);
+                  }}
+                  className="absolute top-3 right-3 bg-white/90 p-2 rounded-full shadow hover:scale-110 transition"
+                >
+                  <Heart
+                    size={18}
+                    className={`transition-colors ${
+                      place.isFavorite
+                        ? "text-rose-500 fill-rose-500"
+                        : "text-gray-600"
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold truncate">{place.title}</h3>
+                <p className="text-sm text-gray-500 truncate">{place.address}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="font-semibold">{formatPrice(place.price)}</span>
+                  <div className="flex items-center text-sm">
+                    <Star className="text-yellow-500 w-4 h-4 mr-1" />
+                    {place.rating ? place.rating.toFixed(1) : "4.8"}
                   </div>
                 </div>
-
-                <div className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">{formatPrice(place.price)}</div>
-                      <div className="text-xs text-gray-500">per night</div>
-                    </div>
-
-                    <div className="inline-flex items-center gap-1 bg-transperant px-2 py-1 rounded-full">
-                      <Star size={14} className="text-yellow-500" />
-                      <span className="text-sm text-gray-700">{place.rating ? place.rating.toFixed(1) : "4.8"}</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.article>
+              </div>
             </Link>
-          );
-        })}
+          </motion.div>
+        ))}
       </div>
 
-      {/* bottom loader */}
+      {/* Infinite scroll */}
       <div ref={listEndRef}>
         {(pageLoading || loading) && <Spinner />}
         {!hasMore && (
-          <div className="text-center text-gray-500 py-6">You've reached the end of the list.</div>
+          <div className="text-center text-gray-500 py-6">
+            You&apos;ve reached the end.
+          </div>
         )}
       </div>
 
-      {/* Filters drawer (simple) */}
-      <AnimatePresence>
-        {filtersOpen && (
-          <motion.aside
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50"
-            aria-modal="true"
-          >
-            {/* Backdrop */}
-            <div
-              onClick={() => setFiltersOpen(false)}
-              className="absolute inset-0 bg-black/40"
-            />
+     <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+  <DialogContent className="sm:max-w-lg">
+    <DialogHeader>
+      <DialogTitle>Filters</DialogTitle>
+      <DialogDescription>
+        Set your filters for price, sort order, location, and other options.
+      </DialogDescription>
+    </DialogHeader>
 
-            {/* Drawer panel (bottom sheet on mobile, side panel on md+) */}
-            <div className="absolute left-0 right-0 bottom-0 md:top-0 md:right-0 md:left-auto md:w-[380px] bg-white rounded-t-2xl md:rounded-l-2xl p-6 shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-semibold">Filters</h4>
-                <button onClick={() => setFiltersOpen(false)} className="px-2 py-1 rounded-full border">Close</button>
-              </div>
+    <div className="space-y-4">
+      {/* Price Range */}
+      <div>
+        <label className="text-sm block mb-1">Price range</label>
+        <Slider
+          value={priceRange}
+          min={500}
+          max={20000}
+          step={500}
+          onValueChange={setPriceRange}
+        />
+        <div className="flex justify-between text-sm text-gray-600 mt-1">
+          <span>₹{priceRange[0]}</span>
+          <span>₹{priceRange[1]}</span>
+        </div>
+      </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-700 block mb-1">Price range (min)</label>
-                  <input
-                    type="number"
-                    value={priceMin}
-                    onChange={(e) => setPriceMin(e.target.value)}
-                    placeholder="e.g. 1000"
-                    className="w-full border rounded px-3 py-2"
-                  />
-                </div>
+      {/* Sort By using shadcn Select */}
+      <div>
+  <label className="text-sm block mb-1">Sort by</label>
+  <Select value={sortBy} onValueChange={setSortBy}>
+  <SelectTrigger className="w-full">
+    <SelectValue placeholder="Newest" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="newest">Newest</SelectItem>
+    <SelectItem value="priceAsc">Price: Low to High</SelectItem>
+    <SelectItem value="priceDesc">Price: High to Low</SelectItem>
+  </SelectContent>
+</Select>
 
-                <div>
-                  <label className="text-sm text-gray-700 block mb-1">Price range (max)</label>
-                  <input
-                    type="number"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(e.target.value)}
-                    placeholder="e.g. 8000"
-                    className="w-full border rounded px-3 py-2"
-                  />
-                </div>
 
-                {/* Placeholder for more filters: amenities, rooms, instant book */}
-                <div>
-                  <label className="text-sm text-gray-700 block mb-2">More filters</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button className="border rounded px-2 py-1 text-sm">Wi-Fi</button>
-                    <button className="border rounded px-2 py-1 text-sm">Kitchen</button>
-                    <button className="border rounded px-2 py-1 text-sm">Air con</button>
-                    <button className="border rounded px-2 py-1 text-sm">Washer</button>
-                  </div>
-                </div>
+</div>
 
-                <div className="flex items-center gap-3">
-                  <button onClick={applyFilters} className="flex-1 bg-rose-500 text-white py-2 rounded-full">
-                    Apply filters
-                  </button>
-                  <button onClick={() => { setPriceMin(""); setPriceMax(""); }} className="px-4 py-2 rounded-full border">
-                    Reset
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+
+      {/* Apply Filters Button */}
+      <Button
+        className="w-full mt-2"
+        onClick={() => {
+          setFiltersOpen(false);
+          setPage(1);
+          fetchPlaces(1, false);
+        }}
+      >
+        Apply Filters
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
     </div>
   );
 }

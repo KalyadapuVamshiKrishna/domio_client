@@ -7,15 +7,28 @@ import BookingWidget from "../components/Booking/BookingWidget";
 import PlaceGallery from "../components/Places/PlaceGallery";
 import AddressLink from "../components/Account/AddressLink";
 import { Card, CardContent } from "@/components/ui/card";
+import { useTranslate } from "../hooks/useTranslate";
+import { useTranslation } from "react-i18next";
 
 export default function PlacePage() {
   const { id } = useParams();
   const [place, setPlace] = useState(null);
 
+  const { i18n } = useTranslation(); // current selected language
+  const { translated, translate } = useTranslate();
+
+  // Fetch place data
   useEffect(() => {
     if (!id) return;
     axios.get(`/places/${id}`).then((response) => setPlace(response.data));
   }, [id]);
+
+  // Translate description dynamically when language changes
+  useEffect(() => {
+    if (place?.description) {
+      translate(place.description, i18n.language);
+    }
+  }, [i18n.language, place?.description]);
 
   if (!place)
     return (
@@ -30,7 +43,9 @@ export default function PlacePage() {
         {/* Title & Address */}
         <div className="mb-4">
           <h1 className="text-3xl font-bold">{place.title}</h1>
-          <AddressLink className="text-gray-500 mt-1 block">{place.address}</AddressLink>
+          <AddressLink className="text-gray-500 mt-1 block">
+            {place.address}
+          </AddressLink>
         </div>
 
         {/* Gallery */}
@@ -45,16 +60,22 @@ export default function PlacePage() {
             <Card className="shadow-lg rounded-3xl">
               <CardContent>
                 <h2 className="text-2xl font-semibold mb-4">Description</h2>
-                <p className="text-gray-700 leading-relaxed">{place.description}</p>
+                <p className="text-gray-700 leading-relaxed">
+                  {/* Use translated text if available, else fallback */}
+                  {translated || place.description}
+                </p>
                 <div className="mt-4 text-gray-600 space-y-2">
                   <div>
-                    <span className="font-semibold">Check-in:</span> {place.checkIn}
+                    <span className="font-semibold">Check-in:</span>{" "}
+                    {place.checkIn}
                   </div>
                   <div>
-                    <span className="font-semibold">Check-out:</span> {place.checkOut}
+                    <span className="font-semibold">Check-out:</span>{" "}
+                    {place.checkOut}
                   </div>
                   <div>
-                    <span className="font-semibold">Max guests:</span> {place.maxGuests}
+                    <span className="font-semibold">Max guests:</span>{" "}
+                    {place.maxGuests}
                   </div>
                 </div>
               </CardContent>
@@ -65,7 +86,9 @@ export default function PlacePage() {
               <Card className="shadow-lg rounded-3xl">
                 <CardContent>
                   <h2 className="text-2xl font-semibold mb-2">Extra Info</h2>
-                  <p className="text-gray-700 leading-relaxed">{place.extraInfo}</p>
+                  <p className="text-gray-700 leading-relaxed">
+                    {place.extraInfo}
+                  </p>
                 </CardContent>
               </Card>
             )}

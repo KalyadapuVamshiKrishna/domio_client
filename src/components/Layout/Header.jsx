@@ -2,6 +2,8 @@ import React, { useContext, useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserContext } from "../../Context/UserContext";
+import { useTranslation } from "react-i18next";
+
 import {
   Globe,
   Menu,
@@ -28,6 +30,8 @@ export default function Header() {
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
   const [searchOpen, setSearchOpen] = useState(false);
+  const { i18n } = useTranslation();
+
 
   const isAuthenticated = !!user;
   const userRole = user?.role || "customer";
@@ -236,9 +240,28 @@ export default function Header() {
                 Login
               </Link>
             )}
-            <button className="p-2 rounded-full hover:bg-gray-100">
-              <Globe className="w-5 h-5" />
-            </button>
+            <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <button className="p-2 rounded-full hover:bg-gray-100 flex items-center gap-1">
+      <Globe className="w-5 h-5" />
+    </button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent align="end">
+    <DropdownMenuItem onClick={() => i18n.changeLanguage("en")}>
+      English
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={() => i18n.changeLanguage("hi")}>
+      हिन्दी
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={() => i18n.changeLanguage("fr")}>
+      Français
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={() => i18n.changeLanguage("es")}>
+      Español
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+
 
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 border rounded-full px-3 py-2 cursor-pointer hover:shadow-md transition">
@@ -259,6 +282,9 @@ export default function Header() {
                   <>
                     <DropdownMenuItem asChild>
                       <Link to="/account">Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/wishlist">Wishlist</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link to="/account/places">My Listings</Link>

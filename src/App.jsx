@@ -8,6 +8,7 @@ import PaymentReceipt from './components/PaymentReceipt';
 import ExperiencePage from './pages/ExperienceDetails';
 import ServicePage from './pages/ServiceDetails';
 import Dashboard from './components/Account/BecomeAHost';
+import FavoritesPage from './pages/FavouritesPage';
 
 
 // Lazy load pages for better performance
@@ -53,6 +54,7 @@ function App() {
                <Route path="/experiences/:id" element={<ExperiencePage />} />
                <Route path="/service/:id" element={<ServicePage />} />
                <Route path="/become-host" element={<Dashboard/>}/>
+               <Route path="/wishlist" element={<FavoritesPage/>}/>
             </Route>
           </Routes>
           <Toaster />

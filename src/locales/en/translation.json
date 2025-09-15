@@ -1,0 +1,7 @@
+{
+  "profile": "Your Profile",
+  "logout": "Logout",
+  "accommodations": "My Accommodations",
+  "listings": "My Listings",
+  "welcome": "Welcome, {{name}}"
+}

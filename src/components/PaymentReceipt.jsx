@@ -1,141 +1,299 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { jsPDF } from "jspdf";
 import Confetti from "react-confetti";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const PaymentReceipt = () => {
+// shadcn/ui components (project -level paths assumed)
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
+import { Copy, Download, Mail, CheckCircle, Home, Share2 } from "lucide-react";
+import { format } from "date-fns";
+
+export default function PaymentReceiptImproved() {
   const [paymentDone, setPaymentDone] = useState(false);
   const [transactionId, setTransactionId] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [hoverQR, setHoverQR] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [bookingId, setBookingId] = useState(null);
+
+  const qrId = "payment-qr-canvas";
+  const qrRef = useRef(null);
   const navigate = useNavigate();
 
-  const { 
-    type, itemId, itemTitle, checkIn, checkOut, selectedDate, numberOfGuests,
-    name, phone, totalPrice, userName, userEmail
+  const {
+    type,
+    itemId,
+    itemTitle,
+    checkIn,
+    checkOut,
+    selectedDate,
+    numberOfGuests,
+    name,
+    phone,
+    totalPrice,
+    userName,
+    userEmail,
   } = useLocation().state || {};
 
-  const date = new Date().toLocaleString();
+  useEffect(() => {
+    // Safety: if component mounted without payment details, redirect
+    if (!totalPrice) {
+      // keep it gentle — only redirect if there's nothing to show
+      // navigate("/", { replace: true });
+    }
+  }, [totalPrice]);
+
+  const dateNow = format(new Date(), "PPP p");
 
   const handlePayment = async () => {
     setProcessing(true);
-    setTimeout(async () => {
-      const id = "TXN-" + Math.floor(Math.random() * 1000000);
+    try {
+      // pretend processing delay
+      await new Promise((r) => setTimeout(r, 1200));
+
+      const id = "TXN-" + Math.floor(Math.random() * 1000000).toString().padStart(6, "0");
       setTransactionId(id);
       setPaymentDone(true);
       setShowConfetti(true);
-      setProcessing(false);
 
-      // Create booking in backend
+      // Create booking in backend and capture bookingId if returned
       try {
         const bookingData = {
           type,
           itemId,
+          title: itemTitle,
           name,
           phone,
           numberOfGuests,
           price: totalPrice,
+          transactionId: id,
           ...(type === "place" ? { checkIn, checkOut } : { date: selectedDate }),
         };
-        await axios.post("/bookings", bookingData);
-      } catch (error) {
-        console.error("Booking Creation Error:", error);
-      }
 
-      setTimeout(() => setShowConfetti(false), 5000);
-    }, 2000);
+        const resp = await axios.post("/account/bookings", bookingData);
+        if (resp?.data?.bookingId) setBookingId(resp.data.bookingId);
+      } catch (err) {
+        // non-fatal: booking creation failed, keep UX graceful
+        console.error("Booking creation failed:", err?.response || err.message || err);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessing(false);
+      // hide confetti after a while
+      setTimeout(() => setShowConfetti(false), 4500);
+    }
   };
 
   const downloadPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+
     doc.setFontSize(20);
-    doc.text("Payment Receipt", 20, 20);
+    doc.text("Payment Receipt", 40, 60);
+
+    // small summary table
     doc.setFontSize(12);
-    doc.text(`Transaction ID: ${transactionId}`, 20, 40);
-    doc.text(`Name: ${name}`, 20, 50);
-    doc.text(`Email: ${userEmail}`, 20, 60);
-    doc.text(`Amount: ₹${totalPrice}`, 20, 70);
-    doc.text(`Date: ${date}`, 20, 80);
-    doc.save(`Receipt_${transactionId}.pdf`);
+    const startY = 100;
+    doc.text(`Transaction ID: ${transactionId}`, 40, startY);
+    doc.text(`Name: ${name}`, 40, startY + 18);
+    doc.text(`Email: ${userEmail || "-"}`, 40, startY + 36);
+    doc.text(`Amount: ₹${totalPrice}`, 40, startY + 54);
+    doc.text(`Date: ${dateNow}`, 40, startY + 72);
+
+    // add item & booking details
+    doc.text(`Item: ${itemTitle || "-"}`, 40, startY + 110);
+    if (type === "place") {
+      doc.text(`Check-in: ${checkIn ? format(new Date(checkIn), "dd MMM yyyy") : "-"}`, 40, startY + 128);
+      doc.text(`Check-out: ${checkOut ? format(new Date(checkOut), "dd MMM yyyy") : "-"}`, 40, startY + 146);
+    } else {
+      doc.text(`Date: ${selectedDate ? format(new Date(selectedDate), "dd MMM yyyy") : "-"}`, 40, startY + 128);
+    }
+
+    // capture QR and add
+    const canvas = document.getElementById(qrId);
+    if (canvas) {
+      const imgData = canvas.toDataURL("image/png");
+      // place QR at right side
+      doc.addImage(imgData, "PNG", doc.internal.pageSize.width - 150, 40, 100, 100);
+    }
+
+    doc.save(`Receipt_${transactionId || "unknown"}.pdf`);
+  };
+
+  const handleCopy = async () => {
+    if (!transactionId) return;
+    try {
+      await navigator.clipboard.writeText(transactionId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (err) {
+      console.error("Copy failed", err);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!userEmail) return setEmailSent(false);
+    try {
+      // optimistic UI
+      setEmailSent(true);
+      await axios.post("/send-receipt", { email: userEmail, transactionId, totalPrice });
+    } catch (err) {
+      console.error("Email send failed", err);
+      setEmailSent(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Payment Receipt", text: `Receipt ${transactionId} - ₹${totalPrice}` });
+      } catch (err) {
+        console.error("Share failed", err);
+      }
+    } else {
+      // fallback: copy
+      handleCopy();
+    }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 relative font-sans pt-16"
-         style={{ background: "linear-gradient(135deg, #f0f4ff, #e6f7ff)" }}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
       {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} />}
 
       {!paymentDone ? (
-        <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-6 w-full max-w-sm border-t-4 border-blue-500">
-          <h2 className="text-2xl font-bold text-gray-800">Complete Your Payment</h2>
-          <p className="text-gray-600 text-lg">Amount: ₹{totalPrice}</p>
-
-          {processing ? (
-            <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-              <div className="bg-blue-500 h-4 animate-pulse w-full"></div>
+        <Card className="w-full max-w-lg shadow-xl">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Complete Your Payment</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Secure checkout powered by your app</p>
+              </div>
+              <Badge variant="secondary">Secure</Badge>
             </div>
-          ) : (
-            <button
-              onClick={handlePayment}
-              className="mt-4 px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
-            >
-              Pay Now
-            </button>
-          )}
-        </div>
+          </CardHeader>
+
+          <CardContent>
+            <div className="flex flex-col gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-semibold">₹{totalPrice}</p>
+                <p className="text-xs text-muted-foreground mt-1">{type === "place" ? "/ night" : "per person"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Pay securely using test gateway (demo)</p>
+                <div className="flex gap-2">
+                  <Button onClick={handlePayment} className="flex-1" disabled={processing}>
+                    {processing ? "Processing..." : "Pay Now"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => navigate(-1)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+
+          <CardFooter className="flex items-center justify-between">
+            <small className="text-xs text-muted-foreground">By continuing you agree to our Terms & Refund Policy</small>
+          </CardFooter>
+        </Card>
       ) : (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md flex flex-col items-center gap-4 border-t-4 border-green-500"
-        >
-          <motion.h2 className="text-2xl font-bold text-green-600 mb-4">
-            Payment Successful!
-          </motion.h2>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-2xl">
+          <Card className="shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="text-green-600" />
+                  <div>
+                    <CardTitle className="text-lg">Payment Successful</CardTitle>
+                    <p className="text-sm text-muted-foreground">Reference #{transactionId}</p>
+                  </div>
+                </div>
 
-          <div className="flex flex-col gap-2 w-full text-gray-700">
-            <p><strong>Transaction ID:</strong> {transactionId}</p>
-            <p><strong>Name:</strong> {name}</p>
-            <p><strong>Email:</strong> {userEmail}</p>
-            <p><strong>Amount:</strong> ₹{totalPrice}</p>
-            <p><strong>Date:</strong> {date}</p>
-          </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">Paid</Badge>
+                </div>
+              </div>
+            </CardHeader>
 
-          <div 
-            className="mt-4 flex flex-col items-center relative shadow-lg p-2 rounded-xl bg-white"
-            onMouseEnter={() => setHoverQR(true)}
-            onMouseLeave={() => setHoverQR(false)}
-          >
-            <QRCodeCanvas value={transactionId} size={hoverQR ? 150 : 128} />
-            <AnimatePresence>
-              {hoverQR && (
-                <motion.span
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5 }}
-                  className="absolute -bottom-7 text-sm bg-gray-800 text-white px-2 py-1 rounded-md"
-                >
-                  Scan to verify transaction
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* left: booking & amounts */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Booking summary</h3>
+                  <div className="text-sm text-muted-foreground">
+                    <p className="truncate"><strong>{itemTitle}</strong></p>
+                    {type === "place" ? (
+                      <p>{checkIn ? format(new Date(checkIn), "dd MMM yyyy") : "-"} — {checkOut ? format(new Date(checkOut), "dd MMM yyyy") : "-"}</p>
+                    ) : (
+                      <p>{selectedDate ? format(new Date(selectedDate), "dd MMM yyyy") : "-"}</p>
+                    )}
+                    <p>Guests: {numberOfGuests || 1}</p>
+                  </div>
 
-          <div className="flex flex-col w-full gap-2 mt-4">
-            <button onClick={downloadPDF} className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-700 text-white rounded-xl shadow-lg">
-              Download Receipt
-            </button>
-            <button onClick={() => navigate("/")} className="px-6 py-2 bg-gray-300 rounded-xl shadow hover:bg-gray-400">
-              Go to Home
-            </button>
-          </div>
+                  <Separator />
+
+                  <div className="text-sm">
+                    <div className="flex items-center justify-between"><span>Subtotal</span><strong>₹{totalPrice}</strong></div>
+                    {/* Add service/fees breakdown if you want */}
+                    <div className="flex items-center justify-between text-muted-foreground text-xs"><span>Service fee</span><span>₹{Math.max(50, Math.round(totalPrice * 0.05))}</span></div>
+                    <div className="flex items-center justify-between mt-2"><span className="text-sm">Total</span><strong>₹{totalPrice}</strong></div>
+                  </div>
+                </div>
+
+                {/* right: QR and actions */}
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-3 bg-white rounded-xl shadow-sm">
+                    <div className="relative">
+                      <QRCodeCanvas id={qrId} value={transactionId} size={160} ref={qrRef} />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 justify-center w-full">
+                    <Tooltip content={copied ? "Copied" : "Copy transaction id"}>
+                      <Button variant="ghost" onClick={handleCopy} className="flex items-center gap-2">
+                        <Copy size={16} /> {copied ? "Copied" : "Copy"}
+                      </Button>
+                    </Tooltip>
+
+                    <Tooltip content={emailSent ? "Receipt sent" : "Send receipt to email"}>
+                      <Button variant="outline" onClick={handleSendEmail} className="flex items-center gap-2">
+                        <Mail size={16} /> {emailSent ? "Sent" : "Email"}
+                      </Button>
+                    </Tooltip>
+
+                    <Button variant="ghost" onClick={downloadPDF} className="flex items-center gap-2">
+                      <Download size={16} /> PDF
+                    </Button>
+
+                    <Button variant="ghost" onClick={handleShare} className="flex items-center gap-2">
+                      <Share2 size={16} /> Share
+                    </Button>
+                  </div>
+
+                  <div className="w-full flex flex-col sm:flex-row gap-2 mt-2">
+                    <Button className="flex-1" onClick={() => bookingId ? navigate(`account/bookings/${bookingId}`) : navigate("account/bookings")}>View booking</Button>
+                    <Button variant="ghost" onClick={() => navigate("/")}>Go home</Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex items-center justify-between">
+              <small className="text-xs text-muted-foreground">Need help? Contact support at support@example.com</small>
+              <small className="text-xs text-muted-foreground">{dateNow}</small>
+            </CardFooter>
+          </Card>
         </motion.div>
       )}
     </div>
   );
-};
-
-export default PaymentReceipt;
+}
