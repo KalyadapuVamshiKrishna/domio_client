@@ -35,7 +35,7 @@ export default function LoginPage() {
         email: "host1@gmail.com",
         password: "rem"
       };
-      const { data } = await axios.post('/login', guestCredentials);
+      const { data } = await axios.post('/login', guestCredentials,{ withCredentials: true });
       setUser(data);
       setRedirect(true);
     } catch (e) {
