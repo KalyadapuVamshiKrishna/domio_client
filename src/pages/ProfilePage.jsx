@@ -23,7 +23,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (ready && user) {
-      axios.get("/profile/stats").then(({ data }) => {
+      axios.get("/profile/stats",  { withCredentials: true }).then(({ data }) => {
         setStats(data);
       });
     }

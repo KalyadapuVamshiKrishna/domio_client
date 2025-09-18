@@ -16,14 +16,14 @@ export default function BookingsPage() {
   const [selectedBookingId, setSelectedBookingId] = useState(null);
 
   useEffect(() => {
-    axios.get("/bookings").then((response) => {
+    axios.get("/bookings", { withCredentials: true }).then((response) => {
       setBookings(response.data);
     });
   }, []);
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`/bookings/${id}`);
+      await axios.delete(`/bookings/${id}`,  { withCredentials: true });
       setBookings((prev) => prev.filter((b) => b._id !== id));
 
       setModalMessage(

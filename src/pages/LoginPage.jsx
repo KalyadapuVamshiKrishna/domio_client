@@ -23,6 +23,7 @@ export default function LoginPage() {
       setRedirect(true);
     } catch (e) {
       alert('Login failed. Please check your credentials.');
+      console.error({message: e});
     } finally {
       setLoading(false);
     }
@@ -40,6 +41,7 @@ export default function LoginPage() {
       setRedirect(true);
     } catch (e) {
       alert('Guest login failed. Please try again.');
+      console.error({message: e});
     } finally {
       setGuestLoading(false);
     }

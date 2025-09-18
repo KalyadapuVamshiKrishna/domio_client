@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 
-// ✅ Always send cookies (JWT session / auth cookies)
+
 axios.defaults.withCredentials = true;
 
 // 🔄 Spinner
@@ -325,7 +325,7 @@ export default function IndexPage() {
     <DialogHeader>
       <DialogTitle>Filters</DialogTitle>
       <DialogDescription>
-        Set your filters for price, sort order, location, and other options.
+        Set your filters for price, sort order, and other options.
       </DialogDescription>
     </DialogHeader>
 

@@ -286,9 +286,9 @@ export default function Header() {
                     <DropdownMenuItem asChild>
                       <Link to="/wishlist">Wishlist</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
+                    {user.role==="host"?<DropdownMenuItem asChild>
                       <Link to="/account/places">My Listings</Link>
-                    </DropdownMenuItem>
+                    </DropdownMenuItem>: null}
                     <DropdownMenuItem asChild>
                       <Link to="/account/bookings">Bookings</Link>
                     </DropdownMenuItem>

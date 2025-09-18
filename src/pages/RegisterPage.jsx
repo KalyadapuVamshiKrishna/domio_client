@@ -27,6 +27,7 @@ export default function RegisterPage() {
       navigate('/login'); // navigate to login page
     } catch (e) {
       alert('Registration failed. Please try again.');
+      console.error({message: e});
     } finally {
       setLoading(false);
     }

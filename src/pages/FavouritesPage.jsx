@@ -12,7 +12,7 @@ export default function FavoritesPage() {
   useEffect(() => {
     const fetchWishlist = async () => {
       try {
-        const res = await axios.get("/wishlist");
+        const res = await axios.get("/wishlist",  { withCredentials: true });
         setPlaces(res.data || []);
       } catch (err) {
         console.error("Failed to fetch wishlist:", err);
@@ -25,7 +25,7 @@ export default function FavoritesPage() {
 
   const toggleFavorite = async (placeId) => {
     try {
-      const res = await axios.post(`/places/${placeId}/toggle-wishlist`);
+      const res = await axios.post(`/places/${placeId}/toggle-wishlist`,  { withCredentials: true });
       // 🔄 API returns updated wishlist → filter local state
       const updatedWishlist = res.data.wishlist || [];
       setPlaces((prev) =>
