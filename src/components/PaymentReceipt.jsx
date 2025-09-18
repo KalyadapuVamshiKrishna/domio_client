@@ -78,7 +78,7 @@ export default function PaymentReceiptImproved() {
           ...(type === "place" ? { checkIn, checkOut } : { date: selectedDate }),
         };
 
-        const resp = await axios.post("/account/bookings", bookingData);
+        const resp = await axios.post("/bookings", bookingData);
         if (resp?.data?.bookingId) setBookingId(resp.data.bookingId);
       } catch (err) {
         // non-fatal: booking creation failed, keep UX graceful
