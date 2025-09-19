@@ -1,6 +1,6 @@
 import PhotosUploader from "../components/Places/PhotosUploader.jsx";
 import Perks from "../components/Places/Perks.jsx";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import AccountNav from "../components/Account/AccountNav.jsx";
 import { Navigate, useParams } from "react-router-dom";
@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, X } from "lucide-react";
+import { Trash2, X, MapPin, Search } from "lucide-react";
 
 export default function PlacesFormPage() {
   const { id } = useParams();
   const [title, setTitle] = useState("");
   const [address, setAddress] = useState("");
+  const [coordinates, setCoordinates] = useState({ lat: 40.7128, lng: -74.0060 }); // Default to NYC
   const [addedPhotos, setAddedPhotos] = useState([]);
   const [description, setDescription] = useState("");
   const [perks, setPerks] = useState([]);
@@ -23,9 +24,146 @@ export default function PlacesFormPage() {
   const [maxGuests, setMaxGuests] = useState(1);
   const [price, setPrice] = useState(100);
   const [redirect, setRedirect] = useState(false);
-
   const [confirmModal, setConfirmModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Google Maps state
+  const [map, setMap] = useState(null);
+  const [marker, setMarker] = useState(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const mapRef = useRef(null);
+  const searchBoxRef = useRef(null);
+
+  // Load Google Maps API
+  useEffect(() => {
+    if (window.google && window.google.maps) {
+      setIsMapLoaded(true);
+      return;
+    }
+
+    // Get API key from environment variables (for production) or use a placeholder
+    const apiKey = import.meta.env?.VITE_GOOGLE_MAPS_API_KEY || 
+                   (typeof process !== 'undefined' && process.env?.REACT_APP_GOOGLE_MAPS_API_KEY) || 
+                   'YOUR_API_KEY_HERE';
+    
+    if (apiKey === 'YOUR_API_KEY_HERE') {
+      console.error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY in your .env file');
+      alert('Google Maps API key not configured. Please contact the administrator.');
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setIsMapLoaded(true);
+    script.onerror = () => {
+      console.error('Failed to load Google Maps API');
+      alert('Failed to load Google Maps. Please check your API key configuration.');
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, []);
+
+  // Initialize map when loaded
+  useEffect(() => {
+    if (!isMapLoaded || !mapRef.current || map) return;
+
+    const mapInstance = new window.google.maps.Map(mapRef.current, {
+      center: coordinates,
+      zoom: 13,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: true,
+      zoomControl: true,
+      styles: [
+        {
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }]
+        }
+      ]
+    });
+
+    const markerInstance = new window.google.maps.Marker({
+      position: coordinates,
+      map: mapInstance,
+      draggable: true,
+      title: "Property Location"
+    });
+
+    // Handle marker drag
+    markerInstance.addListener('dragend', (event) => {
+      const lat = event.latLng.lat();
+      const lng = event.latLng.lng();
+      setCoordinates({ lat, lng });
+      
+      // Reverse geocoding to get address
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+          setAddress(results[0].formatted_address);
+        }
+      });
+    });
+
+    // Handle map click
+    mapInstance.addListener('click', (event) => {
+      const lat = event.latLng.lat();
+      const lng = event.latLng.lng();
+      setCoordinates({ lat, lng });
+      markerInstance.setPosition({ lat, lng });
+      
+      // Reverse geocoding to get address
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+          setAddress(results[0].formatted_address);
+        }
+      });
+    });
+
+    setMap(mapInstance);
+    setMarker(markerInstance);
+  }, [isMapLoaded, coordinates, map]);
+
+  // Handle search
+  const handleSearch = () => {
+    if (!searchInput.trim() || !window.google) return;
+
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: searchInput }, (results, status) => {
+      if (status === 'OK' && results[0]) {
+        const location = results[0].geometry.location;
+        const lat = location.lat();
+        const lng = location.lng();
+        
+        setCoordinates({ lat, lng });
+        setAddress(results[0].formatted_address);
+        
+        if (map && marker) {
+          map.setCenter({ lat, lng });
+          map.setZoom(15);
+          marker.setPosition({ lat, lng });
+        }
+      } else {
+        alert('Location not found. Please try a different search term.');
+      }
+    });
+  };
+
+  const handleSearchKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -41,14 +179,28 @@ export default function PlacesFormPage() {
       setCheckOut(data.checkOut);
       setMaxGuests(data.maxGuests);
       setPrice(data.price);
+      
+      // Set coordinates if available
+      if (data.coordinates) {
+        setCoordinates(data.coordinates);
+      }
     });
   }, [id]);
+
+  // Update map when coordinates change from API
+  useEffect(() => {
+    if (map && marker && coordinates) {
+      map.setCenter(coordinates);
+      marker.setPosition(coordinates);
+    }
+  }, [map, marker, coordinates]);
 
   async function savePlace(ev) {
     ev.preventDefault();
     const placeData = {
       title,
       address,
+      coordinates, // Include coordinates in save data
       photos: addedPhotos,
       description,
       perks,
@@ -90,8 +242,7 @@ export default function PlacesFormPage() {
   if (redirect) return <Navigate to={"/account/places"} />;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <AccountNav />
+    <div className="px-4 py-16 sm:px-6 lg:px-8">
       <form
         className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-md mt-6 space-y-8"
         onSubmit={savePlace}
@@ -110,16 +261,64 @@ export default function PlacesFormPage() {
           />
         </div>
 
-        {/* ✅ Address */}
+        {/* ✅ Location with Google Maps */}
         <div>
-          <Label className="text-lg font-semibold mb-2 block">Address</Label>
-          <Input
-            type="text"
-            value={address}
-            onChange={(ev) => setAddress(ev.target.value)}
-            placeholder="123 Main St, City"
-            required
-          />
+          <Label className="text-lg font-semibold mb-2 block">
+            Location <span className="text-gray-500 text-sm font-normal">(Search and pin your exact location)</span>
+          </Label>
+          
+          {/* Search Input */}
+          <div className="flex gap-2 mb-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                type="text"
+                value={searchInput}
+                onChange={(ev) => setSearchInput(ev.target.value)}
+                onKeyPress={handleSearchKeyPress}
+                placeholder="Search for a location..."
+                className="pl-10"
+              />
+            </div>
+            <Button type="button" onClick={handleSearch} variant="outline">
+              Search
+            </Button>
+          </div>
+
+          {/* Google Maps */}
+          <div className="border rounded-lg overflow-hidden mb-3">
+            <div 
+              ref={mapRef}
+              className="w-full h-80"
+              style={{ minHeight: '320px' }}
+            >
+              {!isMapLoaded && (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                  <div className="text-center">
+                    <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">Loading map...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Selected Address Display */}
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <Label className="text-sm font-medium text-gray-600">Selected Address:</Label>
+            <p className="text-sm text-gray-800 mt-1">
+              {address || "No location selected"}
+            </p>
+            {coordinates && (
+              <p className="text-xs text-gray-500 mt-1">
+                Coordinates: {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+              </p>
+            )}
+          </div>
+
+          <p className="text-gray-500 text-xs mt-2">
+            💡 Tip: Search for your location, then drag the red pin or click on the map for precise positioning
+          </p>
         </div>
 
         {/* ✅ Photos */}

@@ -6,6 +6,7 @@ import PlacesPage from "./PlacesPage.jsx";
 import AccountNav from "../components/Account/AccountNav.jsx";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import { Home, Briefcase, LogOut, Calendar } from "lucide-react";
 
 export default function ProfilePage() {
    const { t } = useTranslation();
@@ -66,23 +67,33 @@ export default function ProfilePage() {
             Member since {getJoinDate(user._id)}
           </p>
 
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <Link
+         <div className={`grid gap-6 mt-8 ${
+    user.role === "host" ? "grid-cols-2" : "grid-cols-1 justify-center"
+  }`}><Link
               to="/account/bookings"
-              className="p-4 bg-gray-50 rounded-lg shadow hover:bg-gray-100 transition"
+              className="flex flex-col items-center p-5 bg-gray-50 rounded-xl shadow hover:bg-gray-100 transition"
             >
-              <p className="text-lg font-bold text-gray-800">{stats.tripsCount}</p>
+              <Calendar className="w-6 h-6 text-indigo-500 mb-2" />
+              <p className="text-lg font-bold text-gray-800">
+                {stats.tripsCount}
+              </p>
               <p className="text-sm text-gray-500">Trips</p>
             </Link>
-            <Link
-              to="/account/places"
-              className="p-4 bg-gray-50 rounded-lg shadow hover:bg-gray-100 transition"
-            >
-              <p className="text-lg font-bold text-gray-800">{stats.listingsCount}</p>
-              <p className="text-sm text-gray-500">Listings</p>
-            </Link>
-          </div>
 
+            {/* Host-only: Listings */}
+            {user.role === "host" && (
+              <Link
+                to="/account/places"
+                className="flex flex-col items-center p-5 bg-gray-50 rounded-xl shadow hover:bg-gray-100 transition"
+              >
+                <Home className="w-6 h-6 text-purple-500 mb-2" />
+                <p className="text-lg font-bold text-gray-800">
+                  {stats.listingsCount}
+                </p>
+                <p className="text-sm text-gray-500">Listings</p>
+              </Link>
+            )}
+          </div>
           {/* Logout Button */}
           <div className="flex justify-center mt-8">
             <Button

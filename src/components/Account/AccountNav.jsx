@@ -4,7 +4,7 @@ import { UserContext } from "../../Context/UserContext";
 
 export default function AccountNav() {
   const { pathname } = useLocation();
-  const { user, setUser } = useContext(UserContext);
+  const { user } = useContext(UserContext);
  
 
   let subpage = pathname.split("/")?.[2] || "profile";

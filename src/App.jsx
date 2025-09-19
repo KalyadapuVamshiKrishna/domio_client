@@ -27,6 +27,7 @@ const Services = lazy(() => import('./pages/ServicesPage'));
 
 import axios from 'axios';
 import ScrollToTop from './components/Layout/ScrollToTop';
+import ScrollToTopBtn from './components/Layout/ScrollToTOpButton';
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 axios.defaults.withCredentials = true;
 
@@ -35,6 +36,7 @@ function App() {
     <UserContextProvider>
       <Router>
         <ScrollToTop/>
+        <ScrollToTopBtn/>
         <Suspense fallback={<div className="text-center py-20 text-gray-500">Loading...</div>}>
           <Routes>
             <Route path="/" element={<Layout />}>

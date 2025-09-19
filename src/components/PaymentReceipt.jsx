@@ -280,7 +280,7 @@ export default function PaymentReceiptImproved() {
                   </div>
 
                   <div className="w-full flex flex-col sm:flex-row gap-2 mt-2">
-                    <Button className="flex-1" onClick={() => bookingId ? navigate(`account/bookings/${bookingId}`) : navigate("account/bookings")}>View booking</Button>
+                    <Button className="flex-1" onClick={() => bookingId ? navigate(`account/bookings/${bookingId}`) : navigate("/account/bookings")}>View booking</Button>
                     <Button variant="ghost" onClick={() => navigate("/")}>Go home</Button>
                   </div>
                 </div>

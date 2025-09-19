@@ -98,15 +98,20 @@ export default function BookingsPage() {
                     <p className="text-gray-500 mb-3">{location}</p>
                   )}
 
+                  {/* ✅ Show who booked */}
+                
+                    <p className="text-sm text-gray-700 mb-2">
+                      <span className="font-medium text-gray-800">Booked by:</span>{" "}
+                      {booking.name}
+                    </p>
+             
                   <BookingDates
                     booking={booking}
                     className="text-sm text-gray-500 mb-3"
                   />
 
                   <div className="flex items-center justify-between mt-3">
-                    <p className="text-lg font-semibold text-rose-500">
-                      ₹{booking.price}
-                    </p>
+                    <p className="text-lg font-semibold text-rose-500">₹{booking.price}</p>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -117,6 +122,7 @@ export default function BookingsPage() {
                     </Button>
                   </div>
                 </CardContent>
+
               </Card>
             );
           })}

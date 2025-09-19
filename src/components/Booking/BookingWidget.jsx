@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 
 export default function BookingWidget({ item, type }) {
   const [checkIn, setCheckIn] = useState(null);
+  const [checkInPopoverOpen, setCheckInPopoverOpen] = useState(false);
+  const [checkOutPopoverOpen, setCheckOutPopoverOpen] = useState(false);
   const [checkOut, setCheckOut] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [numberOfGuests, setNumberOfGuests] = useState(1);
@@ -84,7 +86,7 @@ export default function BookingWidget({ item, type }) {
           {/* Check-in */}
           <div className="flex-1">
             <label className="block mb-1 font-medium text-sm">Check-in</label>
-            <Popover>
+            <Popover open={checkInPopoverOpen} onOpenChange={setCheckInPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -92,6 +94,7 @@ export default function BookingWidget({ item, type }) {
                     "w-full justify-start text-left font-normal truncate",
                     !checkIn && "text-muted-foreground"
                   )}
+                  onClick={() => setCheckInPopoverOpen(true)}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                   {checkIn ? format(checkIn, "dd/MM/yyyy") : "Pick a date"}
@@ -101,8 +104,14 @@ export default function BookingWidget({ item, type }) {
                 <Calendar
                   mode="single"
                   selected={checkIn}
-                  onSelect={setCheckIn}
-                  disabled={(date) => checkOut && date > checkOut}
+                  onSelect={(date) => {
+                    setCheckIn(date);
+                    if (checkOut && date && checkOut <= date) {
+                      setCheckOut(null); // reset invalid checkout
+                    }
+                    if (date) setCheckInPopoverOpen(false);
+                  }}
+                  disabled={(date) => date < new Date().setHours(0, 0, 0, 0)}
                 />
               </PopoverContent>
             </Popover>
@@ -111,7 +120,7 @@ export default function BookingWidget({ item, type }) {
           {/* Check-out */}
           <div className="flex-1">
             <label className="block mb-1 font-medium text-sm">Check-out</label>
-            <Popover>
+            <Popover open={checkOutPopoverOpen} onOpenChange={setCheckOutPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -119,6 +128,7 @@ export default function BookingWidget({ item, type }) {
                     "w-full justify-start text-left font-normal truncate",
                     !checkOut && "text-muted-foreground"
                   )}
+                  onClick={() => setCheckOutPopoverOpen(true)}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                   {checkOut ? format(checkOut, "dd/MM/yyyy") : "Pick a date"}
@@ -128,8 +138,13 @@ export default function BookingWidget({ item, type }) {
                 <Calendar
                   mode="single"
                   selected={checkOut}
-                  onSelect={setCheckOut}
-                  disabled={(date) => checkIn && date <= checkIn}
+                  onSelect={(date) => {
+                    setCheckOut(date);
+                    if (date) setCheckOutPopoverOpen(false);
+                  }}
+                  disabled={(date) =>
+                    date < new Date().setHours(0, 0, 0, 0) || (checkIn && date <= checkIn)
+                  }
                 />
               </PopoverContent>
             </Popover>
@@ -158,6 +173,7 @@ export default function BookingWidget({ item, type }) {
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
+                disabled={(date) => date < new Date().setHours(0, 0, 0, 0)}
               />
             </PopoverContent>
           </Popover>
@@ -171,7 +187,7 @@ export default function BookingWidget({ item, type }) {
           type="number"
           min={1}
           value={numberOfGuests}
-          onChange={(e) => setNumberOfGuests(e.target.value)}
+          onChange={(e) => setNumberOfGuests(Number(e.target.value))}
         />
       </div>
 

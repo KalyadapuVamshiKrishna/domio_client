@@ -46,45 +46,44 @@ export default function Dashboard() {
       {user.role === "customer" && (
         <div className="space-y-10">
           {/* Hero Section */}
-          {/* Hero Section */}
-<section className="grid grid-cols-1 sm:grid-cols-2 items-center gap-10 py-12">
-  {/* Left Content */}
-  <div className="text-left space-y-6">
-    <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">
-      Turn Your <span className="text-rose-500">Space</span> Into <br /> Steady Income
-    </h2>
-    <p className="text-lg text-gray-600 leading-relaxed">
-      Hosting isn’t just about sharing your space — it’s about creating memorable
-      stays while unlocking <span className="font-semibold text-gray-800">passive income</span>. 
-      Be in charge of your schedule, meet people from across the world, and make 
-      your home work for you.
-    </p>
+    <section className="grid grid-cols-1 sm:grid-cols-2 items-center gap-10 py-12">
+      {/* Left Content */}
+      <div className="text-left space-y-6">
+        <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">
+          Turn Your <span className="text-rose-500">Space</span> Into <br /> Steady Income
+        </h2>
+        <p className="text-lg text-gray-600 leading-relaxed">
+          Hosting isn’t just about sharing your space — it’s about creating memorable
+          stays while unlocking <span className="font-semibold text-gray-800">passive income</span>. 
+          Be in charge of your schedule, meet people from across the world, and make 
+          your home work for you.
+        </p>
 
-    <ul className="space-y-3 text-gray-700 text-base">
-      <li className="flex items-center gap-2">
-        <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
-        Earn money effortlessly with flexible hosting.
-      </li>
-      <li className="flex items-center gap-2">
-        <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
-        Choose when your space is available — total control.
-      </li>
-      <li className="flex items-center gap-2">
-        <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
-        Connect with travelers and share unique experiences.
-      </li>
-    </ul>
-  </div>
+        <ul className="space-y-3 text-gray-700 text-base">
+          <li className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
+            Earn money effortlessly with flexible hosting.
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
+            Choose when your space is available — total control.
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
+            Connect with travelers and share unique experiences.
+          </li>
+        </ul>
+      </div>
 
-  {/* Right Illustration */}
-  <div className="flex justify-center">
-    <img
-      src="host.png"
-      alt="Hosting illustration"
-      className="w-full max-w-3md rounded-2xl "
-    />
-  </div>
-</section>
+      {/* Right Illustration */}
+      <div className="flex justify-center">
+        <img
+          src="host.png"
+          alt="Hosting illustration"
+          className="w-full max-w-3md rounded-2xl "
+        />
+      </div>
+    </section>
 
 
           {/* Benefits Section */}
@@ -143,9 +142,9 @@ export default function Dashboard() {
           </p>
           <Button
             className="mt-6 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl shadow"
-            onClick={() => (window.location.href = "/host/dashboard")}
+            onClick={() => (window.location.href = "/account")}
           >
-            Go to Host Dashboard
+            Go to Your Profile
           </Button>
         </div>
       )}

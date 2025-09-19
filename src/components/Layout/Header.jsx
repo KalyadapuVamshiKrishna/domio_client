@@ -29,34 +29,112 @@ export default function Header() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
+  const [searchResults, setSearchResults] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
+
   const { i18n } = useTranslation();
-
-
   const isAuthenticated = !!user;
   const userRole = user?.role || "customer";
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
   const tabs = [
-    { name: "Home", path: "/" },
-    { name: "Experiences", path: "/experiences" },
-    { name: "Services", path: "/services" },
+    { name: "Home", path: "/", icon: <Home className="w-4 h-4" /> },
+    { name: "Experiences", path: "/experiences", icon: <Compass className="w-4 h-4" /> },
+    { name: "Services", path: "/services", icon: <Briefcase className="w-4 h-4" /> },
   ];
 
-  function handleSearch() {
-    if (!locationInput) return;
-    const params = new URLSearchParams({
-      location: locationInput,
-      checkIn,
-      checkOut,
-      guests,
-    }).toString();
-    navigate(`/?${params}`);
-    setSearchOpen(false);
+  function useDebounce(value, delay) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+      const handler = setTimeout(() => setDebouncedValue(value), delay);
+      return () => clearTimeout(handler);
+    }, [value, delay]);
+
+    return debouncedValue;
   }
 
-  async function handleLogout() {
+  const debouncedLocation = useDebounce(locationInput, 300);
+
+  // Fetch search results and auto-navigate ONLY when on home page
+  useEffect(() => {
+    if (!debouncedLocation) {
+      setSearchResults([]);
+      // If user clears search while on home page, clear URL params
+      if (pathname === '/') {
+        const currentParams = new URLSearchParams(window.location.search);
+        if (currentParams.has('location')) {
+          navigate('/', { replace: true });
+        }
+      }
+      return;
+    }
+
+    const fetchListings = async () => {
+      try {
+        let endpoint = '';
+        
+        // Determine API endpoint based on current tab
+        switch (pathname) {
+          case '/':
+            endpoint = `/places?search=${debouncedLocation}`;
+            break;
+          case '/experiences':
+            endpoint = `/experiences?search=${debouncedLocation}`;
+            break;
+          case '/services':
+            endpoint = `/services?search=${debouncedLocation}`;
+            break;
+          default:
+            endpoint = `/places?search=${debouncedLocation}`;
+        }
+
+        const res = await axios.get(endpoint);
+        setSearchResults(res.data);
+        
+        // Auto-navigate with search params based on current tab
+        const params = new URLSearchParams({
+          location: debouncedLocation,
+          checkIn,
+          checkOut,
+          guests,
+        }).toString();
+        
+        // Navigate to current tab with search params
+        navigate(`${pathname}?${params}`, { replace: true });
+        
+      } catch (err) {
+        console.error("Failed to fetch listings:", err);
+        setSearchResults([]);
+      }
+    };
+
+    fetchListings();
+  }, [debouncedLocation, pathname, checkIn, checkOut, guests, navigate]);
+
+  // Initialize search params from URL on component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const location = urlParams.get('location') || '';
+    const checkInParam = urlParams.get('checkIn') || '';
+    const checkOutParam = urlParams.get('checkOut') || '';
+    const guestsParam = urlParams.get('guests') || '1';
+
+    setLocationInput(location);
+    setCheckIn(checkInParam);
+    setCheckOut(checkOutParam);
+    setGuests(guestsParam);
+  }, []);
+
+  // Scroll Handler
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleLogout = async () => {
     try {
       await axios.post("/logout");
       setUser(null);
@@ -64,13 +142,53 @@ export default function Header() {
     } catch (err) {
       console.error("Logout failed:", err);
     }
-  }
+  };
 
+  // Navigate when user explicitly searches - now respects current tab
+  const handleSearch = () => {
+    if (!locationInput) return;
+    
+    const params = new URLSearchParams({
+      location: locationInput,
+      checkIn,
+      checkOut,
+      guests,
+    }).toString();
+    
+    // Navigate to current tab or home if on unknown route
+    const targetPath = ['/experiences', '/services'].includes(pathname) ? pathname : '/';
+    navigate(`${targetPath}?${params}`);
+    setSearchOpen(false);
+    setSearchResults([]); // Clear search dropdown
+  };
+
+  // Handle selecting a search result - now navigates to appropriate detail page
+  const handleSearchResultClick = (item) => {
+    let detailRoute = '';
+    
+    // Determine detail route based on current tab
+    switch (pathname) {
+      case '/experiences':
+        detailRoute = `/experience/${item.id}`;
+        break;
+      case '/services':
+        detailRoute = `/service/${item.id}`;
+        break;
+      default:
+        detailRoute = `/listing/${item.id}`;
+    }
+    
+    navigate(detailRoute);
+    setLocationInput(item.name || item.title);
+    setSearchResults([]);
+  };
+
+  // Clear search when navigating away from home
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    if (pathname !== '/') {
+      setSearchResults([]);
+    }
+  }, [pathname]);
 
   return (
     <>
@@ -89,8 +207,9 @@ export default function Header() {
               className="cursor-pointer"
               initial={{ width: "140px" }}
               animate={{
-                width: isScrolled ? "60px" : "100px",
-                scale: isScrolled ? 0.95 : 1,
+                width: isScrolled ? "40px" : "100px",
+                scale: isScrolled ? 2 : 1,
+                
               }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
               whileHover={{ scale: 1.05 }}
@@ -98,24 +217,53 @@ export default function Header() {
           </Link>
 
           {/* Center: Tabs + Search */}
-          <div className="hidden md:flex flex-col flex-1 items-center">
+          <div className="hidden md:flex flex-col flex-1 items-center relative">
             {/* Tabs */}
-            <AnimatePresence>
-              {!isScrolled && (
+            <AnimatePresence mode="wait">
+              {isScrolled ? (
                 <motion.div
-                  key="tabs"
+                  key="collapsed-tabs"
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="flex gap-8 text-sm font-medium justify-center"
+                >
+                  {tabs.map((tab) => {
+                    const isActive = pathname === tab.path;
+                    return (
+                      <Link
+                        key={tab.name}
+                        to={tab.path}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all ${
+                          isActive
+                            ? "text-rose-600 bg-rose-50 shadow-sm"
+                            : "text-gray-600 hover:text-rose-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        <span className={`${isActive ? "text-rose-600" : "text-gray-500"}`}>
+                          {tab.icon}
+                        </span>
+                        <span className="hidden sm:inline">{tab.name}</span>
+                      </Link>
+                    );
+                  })}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="expanded-tabs"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4, ease: "easeInOut" }}
-                  className="flex gap-6 mb-2 text-sm font-medium flex-wrap justify-center"
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="flex gap-6 mb-2 text-sm  font-medium flex-wrap justify-center"
                 >
                   {tabs.map((tab) => (
                     <Link
                       key={tab.name}
                       to={tab.path}
-                      className={`pb-2 cursor-pointer ${
-                        pathname === tab.path ? "border-b-2 border-black" : ""
+                      className={`pb-2  cursor-pointer ${
+                        pathname === tab.path ? "border-b-2 text-rose-600 border-rose-600" : ""
                       }`}
                     >
                       {tab.name}
@@ -127,16 +275,17 @@ export default function Header() {
 
             {/* Search Bar */}
             <motion.div
-              className="bg-white shadow-md border flex items-center w-full max-w-lg overflow-hidden"
+              className="bg-white shadow-md border flex items-center w-full max-w-lg overflow-hidden relative"
               animate={{
-                width: isScrolled ? "40%" : "100%",
-                borderRadius: isScrolled ? "9999px" : "2rem",
-                padding: isScrolled ? "0.4rem 1rem" : "0.8rem 1rem",
+                width: isScrolled ? "0%" : "100%",
+                opacity: isScrolled ? 0 : 1,
+                borderRadius: isScrolled ? "0" : "2rem",
+                padding: isScrolled ? "0" : "0.8rem 1rem",
               }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
             >
               <AnimatePresence mode="wait">
-                {!isScrolled ? (
+                {!isScrolled && (
                   <motion.div
                     key="expanded"
                     layout
@@ -144,9 +293,9 @@ export default function Header() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
                     transition={{ duration: 0.4, ease: "easeInOut" }}
-                    className="flex items-center gap-4 w-full min-w-0"
+                    className="flex items-center gap-4 w-full min-w-0 relative"
                   >
-                    <div className="flex flex-col flex-grow min-w-[100px]">
+                    <div className="flex flex-col flex-grow min-w-[119px] relative">
                       <label className="text-xs font-semibold mb-1">Where</label>
                       <input
                         type="text"
@@ -155,29 +304,55 @@ export default function Header() {
                         onChange={(e) => setLocationInput(e.target.value)}
                         className="text-sm outline-none placeholder-gray-400"
                       />
+
+                      {/* Dropdown Results */}
+                      {searchResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 bg-white shadow-md rounded-md mt-1 max-h-60 overflow-y-auto z-50">
+                          {searchResults.map((listing) => (
+                            <div
+                              key={listing.id}
+                              className="p-2 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSearchResultClick(listing)}
+                            >
+                              {listing.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+
                     <div className="border-l h-10 border-gray-300" />
-                    <div className="flex flex-col flex-grow min-w-[90px]">
+
+                    {/* Check-in */}
+                    <div className="flex flex-col flex-grow min-w-[100px]">
                       <label className="text-xs font-semibold mb-1">Check in</label>
                       <input
                         type="date"
                         value={checkIn}
+                        min={new Date().toISOString().split("T")[0]}
                         onChange={(e) => setCheckIn(e.target.value)}
                         className="text-sm outline-none"
                       />
                     </div>
+
                     <div className="border-l h-10 border-gray-300" />
-                    <div className="flex flex-col flex-grow min-w-[90px]">
+
+                    {/* Check-out */}
+                    <div className="flex flex-col flex-grow min-w-[100px]">
                       <label className="text-xs font-semibold mb-1">Check out</label>
                       <input
                         type="date"
                         value={checkOut}
+                        min={checkIn || new Date().toISOString().split("T")[0]}
                         onChange={(e) => setCheckOut(e.target.value)}
                         className="text-sm outline-none"
                       />
                     </div>
+
                     <div className="border-l h-10 border-gray-300" />
-                    <div className="flex flex-col flex-grow w-4">
+
+                    {/* Guests */}
+                    <div className="flex flex-col flex-grow min-w-[20px]">
                       <label className="text-xs font-semibold mb-1">Who</label>
                       <input
                         type="number"
@@ -185,34 +360,13 @@ export default function Header() {
                         min="1"
                         value={guests}
                         onChange={(e) => setGuests(e.target.value)}
-                        className="text-sm outline-none placeholder-gray-400"
+                        className="text-sm text-center outline-none placeholder-gray-400"
                       />
                     </div>
+
                     <button
                       onClick={handleSearch}
                       className="flex-shrink-0 bg-rose-500 text-white p-3 rounded-full hover:bg-rose-600"
-                    >
-                      <Search className="w-4 h-4" />
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="collapsed"
-                    layout
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.1, ease: "easeInOut" }}
-                    className="flex justify-between items-center text-gray-600 text-sm w-full px-4"
-                  >
-                    <span className="cursor-pointer hover:underline">Anywhere</span>
-                    <span>·</span>
-                    <span>Any week</span>
-                    <span>·</span>
-                    <span>Add guests</span>
-                    <button
-                      onClick={handleSearch}
-                      className="ml-2 bg-rose-500 text-white px-4 py-2 rounded-full flex items-center justify-center hover:bg-rose-600"
                     >
                       <Search className="w-4 h-4" />
                     </button>
@@ -241,27 +395,26 @@ export default function Header() {
               </Link>
             )}
             <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <button className="p-2 rounded-full hover:bg-gray-100 flex items-center gap-1">
-      <Globe className="w-5 h-5" />
-    </button>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="end">
-    <DropdownMenuItem onClick={() => i18n.changeLanguage("en")}>
-      English
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={() => i18n.changeLanguage("hi")}>
-      हिन्दी
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={() => i18n.changeLanguage("fr")}>
-      Français
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={() => i18n.changeLanguage("es")}>
-      Español
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
-
+              <DropdownMenuTrigger asChild>
+                <button className="p-2 rounded-full hover:bg-gray-100 flex items-center gap-1">
+                  <Globe className="w-5 h-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => i18n.changeLanguage("en")}>
+                  English
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => i18n.changeLanguage("hi")}>
+                  हिन्दी
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => i18n.changeLanguage("fr")}>
+                  Français
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => i18n.changeLanguage("es")}>
+                  Español
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 border rounded-full px-3 py-2 cursor-pointer hover:shadow-md transition">
@@ -286,9 +439,11 @@ export default function Header() {
                     <DropdownMenuItem asChild>
                       <Link to="/wishlist">Wishlist</Link>
                     </DropdownMenuItem>
-                    {user.role==="host"?<DropdownMenuItem asChild>
-                      <Link to="/account/places">My Listings</Link>
-                    </DropdownMenuItem>: null}
+                    {user.role === "host" && (
+                      <DropdownMenuItem asChild>
+                        <Link to="/account/places">My Listings</Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem asChild>
                       <Link to="/account/bookings">Bookings</Link>
                     </DropdownMenuItem>
@@ -314,7 +469,7 @@ export default function Header() {
       </nav>
 
       {/* Mobile Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 w-full bg-white shadow-md flex justify-around py-2 md:hidden z-50 border-t">
+      <div className="fixed bottom-0 left-0 w-full gap-15 bg-white shadow-md flex justify-around py-2 md:hidden z-50 border-t">
         <Link
           to="/"
           className={`flex flex-col items-center ${
