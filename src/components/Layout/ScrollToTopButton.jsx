@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ScrollToTopBtn = () => {
+const ScrollToTopButton = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   // Track scroll position
@@ -54,4 +54,4 @@ const ScrollToTopBtn = () => {
   );
 };
 
-export default ScrollToTopBtn;
+export default ScrollToTopButton;
