@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserContext } from "../../Context/UserContext";
 import { useTranslation } from "react-i18next";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 import {
   Globe,
@@ -469,7 +471,7 @@ export default function Header() {
       </nav>
 
       {/* Mobile Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 w-full gap-15 bg-white shadow-md flex justify-around py-2 md:hidden z-50 border-t">
+      <div className="fixed bottom-0 left-0 w-full gap-10 p-4 bg-white shadow-md flex justify-around py-2 md:hidden z-50 border-t">
         <Link
           to="/"
           className={`flex flex-col items-center ${
@@ -512,54 +514,73 @@ export default function Header() {
 
       {/* Search Modal for Mobile */}
       {searchOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-white z-50 p-4"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Search</h2>
-            <button onClick={() => setSearchOpen(false)}>
-              <X className="w-6 h-6 text-gray-600" />
-            </button>
-          </div>
-          <div className="flex flex-col gap-4">
-            <input
-              type="text"
-              placeholder="Where are you going?"
-              className="border p-3 rounded-lg"
-              value={locationInput}
-              onChange={(e) => setLocationInput(e.target.value)}
-            />
-            <input
-              type="date"
-              className="border p-3 rounded-lg"
-              value={checkIn}
-              onChange={(e) => setCheckIn(e.target.value)}
-            />
-            <input
-              type="date"
-              className="border p-3 rounded-lg"
-              value={checkOut}
-              onChange={(e) => setCheckOut(e.target.value)}
-            />
-            <input
-              type="number"
-              min="1"
-              placeholder="Guests"
-              className="border p-3 rounded-lg"
-              value={guests}
-              onChange={(e) => setGuests(e.target.value)}
-            />
-            <button
-              onClick={handleSearch}
-              className="bg-rose-500 text-white py-3 rounded-lg"
-            >
-              Search
-            </button>
-          </div>
-        </motion.div>
-      )}
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="fixed inset-0 bg-white z-50 p-4"
+  >
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="text-lg font-semibold">Search</h2>
+      <button onClick={() => setSearchOpen(false)}>
+        <X className="w-6 h-6 text-gray-600" />
+      </button>
+    </div>
+
+    <div className="flex flex-col gap-4">
+      {/* Location */}
+      <input
+        type="text"
+        placeholder="Where are you going?"
+        className="border p-3 rounded-lg"
+        value={locationInput}
+        onChange={(e) => setLocationInput(e.target.value)}
+      />
+
+      {/* Check-in */}
+      <DatePicker
+        selected={checkIn}
+        onChange={(date) => setCheckIn(date)}
+        placeholderText="Check-in"
+        minDate={new Date()} // block past dates
+        selectsStart
+        startDate={checkIn}
+        endDate={checkOut}
+        className="border p-3 rounded-lg w-full"
+      />
+
+      {/* Check-out */}
+      <DatePicker
+        selected={checkOut}
+        onChange={(date) => setCheckOut(date)}
+        placeholderText="Check-out"
+        minDate={checkIn || new Date()}
+        selectsEnd
+        startDate={checkIn}
+        endDate={checkOut}
+        className="border p-3 rounded-lg w-full"
+      />
+
+      {/* Guests */}
+      <input
+        type="number"
+        min="1"
+        placeholder="Guests"
+        className="border p-3 rounded-lg"
+        value={guests}
+        onChange={(e) => setGuests(e.target.value)}
+      />
+
+      {/* Search button */}
+      <button
+        onClick={handleSearch}
+        className="bg-rose-500 text-white py-3 rounded-lg"
+      >
+        Search
+      </button>
+    </div>
+  </motion.div>
+)}
+
     </>
   );
 }
