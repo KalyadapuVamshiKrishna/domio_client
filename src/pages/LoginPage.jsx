@@ -55,25 +55,33 @@ export default function LoginPage() {
         <h1 className="text-3xl font-bold text-center mb-6">Login</h1>
         <form className="space-y-4" onSubmit={handleLoginSubmit}>
           <div>
-            <Label>Email</Label>
+            <Label htmlFor="login-email">Email</Label>
             <Input
               type="email"
+              id="login-email"
+              name="email"
               placeholder="your@email.com"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
+              autoComplete="email"
               required
             />
           </div>
+
           <div>
-            <Label>Password</Label>
+            <Label htmlFor="login-password">Password</Label>
             <Input
               type="password"
+              id="login-password"
+              name="password"
               placeholder="password"
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
+              autoComplete="current-password"
               required
             />
           </div>
+
           <Button className="w-full" type="submit" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </Button>

@@ -249,8 +249,8 @@ export default function PlacesFormPage() {
       >
         {/* ✅ Title */}
         <div>
-          <Label className="text-lg font-semibold mb-2 block">
-            Title <span className="text-gray-500 text-sm font-normal">(Short and catchy)</span>
+          <Label htmlFor="title" className="text-lg font-semibold mb-2 block">
+            Title <span  className="text-gray-500 text-sm font-normal">(Short and catchy)</span>
           </Label>
           <Input
             type="text"
@@ -330,9 +330,10 @@ export default function PlacesFormPage() {
 
         {/* ✅ Description */}
         <div>
-          <Label className="text-lg font-semibold mb-2 block">Description</Label>
+          <Label  htmlFor="description" className="text-lg font-semibold mb-2 block">Description</Label>
           <Textarea
             value={description}
+            id="description"
             onChange={(ev) => setDescription(ev.target.value)}
             placeholder="Describe your place..."
             rows={5}

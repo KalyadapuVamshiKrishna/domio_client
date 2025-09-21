@@ -38,63 +38,66 @@ export default function RegisterPage() {
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-md">
         <h1 className="text-3xl font-bold text-center mb-6">Register</h1>
         <form className="space-y-4" onSubmit={registerUser}>
-          <div>
-            <Label>Full Name</Label>
-            <Input
-              type="text"
-              placeholder="John Doe"
-              value={name}
-              onChange={ev => setName(ev.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={ev => setEmail(ev.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label>Password</Label>
-            <Input
-              type="password"
-              placeholder="password"
-              value={password}
-              onChange={ev => setPassword(ev.target.value)}
-              required
-            />
-          </div>
+              <div>
+                <Label htmlFor="signup-email">Email</Label>
+                <Input
+                  type="email"
+                  id="signup-email"
+                  name="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(ev) => setEmail(ev.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
 
-          {/* Role Selection */}
-          <div>
-            <Label>Select Role</Label>
-            <div className="flex gap-4 mt-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  value="customer"
-                  checked={role === 'customer'}
-                  onChange={() => setRole('customer')}
-                  className="accent-blue-500"
+              <div>
+                <Label htmlFor="signup-password">Password</Label>
+                <Input
+                  type="password"
+                  id="signup-password"
+                  name="password"
+                  placeholder="password"
+                  value={password}
+                  onChange={(ev) => setPassword(ev.target.value)}
+                  autoComplete="new-password"
+                  required
                 />
-                Customer
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  value="host"
-                  checked={role === 'host'}
-                  onChange={() => setRole('host')}
-                  className="accent-blue-500"
-                />
-                Host
-              </label>
-            </div>
-          </div>
+              </div>
+
+              {/* Role Selection */}
+<div>
+  <Label>Select Role</Label>
+  <div className="flex gap-4 mt-2">
+    <label htmlFor="role-customer" className="flex items-center gap-2">
+      <input
+        type="radio"
+        id="role-customer"
+        name="role"
+        value="customer"
+        checked={role === "customer"}
+        onChange={() => setRole("customer")}
+        className="accent-blue-500"
+      />
+      Customer
+    </label>
+
+    <label htmlFor="role-host" className="flex items-center gap-2">
+      <input
+        type="radio"
+        id="role-host"
+        name="role"
+        value="host"
+        checked={role === "host"}
+        onChange={() => setRole("host")}
+        className="accent-blue-500"
+      />
+      Host
+    </label>
+  </div>
+</div>
+
 
           <Button className="w-full" type="submit" disabled={loading}>
             {loading ? "Registering..." : "Register"}
