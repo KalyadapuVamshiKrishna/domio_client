@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { differenceInCalendarDays, format } from "date-fns";
-import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../Context/UserContext.jsx";
+import { useNavigate } from "react-router-dom";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,14 @@ import { cn } from "@/lib/utils";
 export default function BookingWidget({ item, type }) {
   const [checkIn, setCheckIn] = useState(null);
   const [checkInPopoverOpen, setCheckInPopoverOpen] = useState(false);
-  const [checkOutPopoverOpen, setCheckOutPopoverOpen] = useState(false);
   const [checkOut, setCheckOut] = useState(null);
+  const [checkOutPopoverOpen, setCheckOutPopoverOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [numberOfGuests, setNumberOfGuests] = useState(1);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
@@ -41,6 +43,9 @@ export default function BookingWidget({ item, type }) {
       ? numberOfNights * item.price
       : item.price * numberOfGuests;
 
+  const serviceFee = Math.max(50, Math.round(totalPrice * 0.05));
+  const grandTotal = totalPrice + serviceFee;
+
   function handleProceedToPayment() {
     if (type === "place" && (!checkIn || !checkOut)) {
       return alert("Please select check-in and check-out dates.");
@@ -52,22 +57,25 @@ export default function BookingWidget({ item, type }) {
       return alert("Please fill in all details.");
     }
 
-    navigate("/payment", {
-      state: {
-        type,
-        itemId: item._id,
-        itemTitle: item.title,
-        checkIn,
-        checkOut,
-        selectedDate,
-        numberOfGuests,
-        name,
-        phone,
-        totalPrice,
-        userName: user?.name,
-        userEmail: user?.email,
-      },
-    });
+    // Normally you'd create a booking and initiate payment via API here.
+    // Instead, we'll navigate to the PaymentReceipt page with all necessary info.
+    const state = {
+      type,
+      itemId: item._id,
+      itemTitle: item.title || item.name,
+      checkIn: checkIn ? checkIn.toISOString() : null,
+      checkOut: checkOut ? checkOut.toISOString() : null,
+      selectedDate: selectedDate ? selectedDate.toISOString() : null,
+      numberOfGuests,
+      name,
+      phone,
+      totalPrice: grandTotal,
+      userName: user?.name || name,
+      userEmail: user?.email || "",
+      paymentMethod: "Test Gateway",
+    };
+
+    navigate("/payment", { state });
   }
 
   return (
@@ -86,7 +94,10 @@ export default function BookingWidget({ item, type }) {
           {/* Check-in */}
           <div className="flex-1">
             <label className="block mb-1 font-medium text-sm">Check-in</label>
-            <Popover open={checkInPopoverOpen} onOpenChange={setCheckInPopoverOpen}>
+            <Popover
+              open={checkInPopoverOpen}
+              onOpenChange={setCheckInPopoverOpen}
+            >
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -94,7 +105,6 @@ export default function BookingWidget({ item, type }) {
                     "w-full justify-start text-left font-normal truncate",
                     !checkIn && "text-muted-foreground"
                   )}
-                  onClick={() => setCheckInPopoverOpen(true)}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                   {checkIn ? format(checkIn, "dd/MM/yyyy") : "Pick a date"}
@@ -106,9 +116,7 @@ export default function BookingWidget({ item, type }) {
                   selected={checkIn}
                   onSelect={(date) => {
                     setCheckIn(date);
-                    if (checkOut && date && checkOut <= date) {
-                      setCheckOut(null); // reset invalid checkout
-                    }
+                    if (checkOut && date && checkOut <= date) setCheckOut(null);
                     if (date) setCheckInPopoverOpen(false);
                   }}
                   disabled={(date) => date < new Date().setHours(0, 0, 0, 0)}
@@ -120,7 +128,10 @@ export default function BookingWidget({ item, type }) {
           {/* Check-out */}
           <div className="flex-1">
             <label className="block mb-1 font-medium text-sm">Check-out</label>
-            <Popover open={checkOutPopoverOpen} onOpenChange={setCheckOutPopoverOpen}>
+            <Popover
+              open={checkOutPopoverOpen}
+              onOpenChange={setCheckOutPopoverOpen}
+            >
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -128,7 +139,6 @@ export default function BookingWidget({ item, type }) {
                     "w-full justify-start text-left font-normal truncate",
                     !checkOut && "text-muted-foreground"
                   )}
-                  onClick={() => setCheckOutPopoverOpen(true)}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                   {checkOut ? format(checkOut, "dd/MM/yyyy") : "Pick a date"}
@@ -143,7 +153,8 @@ export default function BookingWidget({ item, type }) {
                     if (date) setCheckOutPopoverOpen(false);
                   }}
                   disabled={(date) =>
-                    date < new Date().setHours(0, 0, 0, 0) || (checkIn && date <= checkIn)
+                    date < new Date().setHours(0, 0, 0, 0) ||
+                    (checkIn && date <= checkIn)
                   }
                 />
               </PopoverContent>
@@ -163,9 +174,7 @@ export default function BookingWidget({ item, type }) {
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                {selectedDate
-                  ? format(selectedDate, "dd/MM/yyyy")
-                  : "Pick a date"}
+                {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Pick a date"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="p-0" align="start">
@@ -195,20 +204,11 @@ export default function BookingWidget({ item, type }) {
       <div className="mb-4 space-y-3">
         <div>
           <label className="block mb-1 font-medium text-sm">Full Name</label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="John Doe"
-          />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" />
         </div>
         <div>
           <label className="block mb-1 font-medium text-sm">Phone</label>
-          <Input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+91 98765 43210"
-          />
+          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
         </div>
       </div>
 
@@ -216,10 +216,13 @@ export default function BookingWidget({ item, type }) {
       <Button
         onClick={handleProceedToPayment}
         className="w-full bg-rose-500 hover:bg-rose-600 text-white"
+        disabled={loading}
       >
-        Proceed to Pay{" "}
-        {totalPrice > 0 && <span className="font-bold">₹{totalPrice}</span>}
+        {loading ? "Processing..." : "Proceed to Pay"}{" "}
+        {grandTotal > 0 && <span className="font-bold">₹{grandTotal}</span>}
       </Button>
+
+      {message && <p className="text-center mt-4 text-sm text-gray-600">{message}</p>}
     </div>
   );
 }

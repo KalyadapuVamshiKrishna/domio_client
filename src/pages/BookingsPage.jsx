@@ -11,19 +11,21 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState([]);
   const [modalMessage, setModalMessage] = useState("");
   const [showModal, setShowModal] = useState(false);
-
   const [confirmModal, setConfirmModal] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
 
   useEffect(() => {
-    axios.get("/bookings", { withCredentials: true }).then((response) => {
-      setBookings(response.data);
-    });
+    axios
+      .get("/bookings", { withCredentials: true })
+      .then((response) => {
+        setBookings(response.data.bookings); // ✅ updated to match your backend
+      })
+      .catch((err) => console.error(err));
   }, []);
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`/bookings/${id}`,  { withCredentials: true });
+      await axios.delete(`/bookings/${id}`, { withCredentials: true });
       setBookings((prev) => prev.filter((b) => b._id !== id));
 
       setModalMessage(
@@ -84,7 +86,7 @@ export default function BookingsPage() {
 
                 {/* Card Content */}
                 <CardContent className="p-4 flex flex-col justify-between flex-1">
-                  {booking.place ? (
+                  {booking.place && (
                     <>
                       <h2 className="text-lg font-semibold mb-2 truncate">
                         {booking.place.title}
@@ -94,35 +96,42 @@ export default function BookingsPage() {
                         {location}
                       </p>
                     </>
-                  ) : (
-                    <p className="text-gray-500 mb-3">{location}</p>
                   )}
 
-                  {/* ✅ Show who booked */}
-                
-                    <p className="text-sm text-gray-700 mb-2">
-                      <span className="font-medium text-gray-800">Booked by:</span>{" "}
-                      {booking.name}
-                    </p>
-             
+                  <p className="text-sm text-gray-700 mb-2">
+                    <span className="font-medium text-gray-800">Booked by:</span>{" "}
+                    {booking.name}
+                  </p>
+
                   <BookingDates
                     booking={booking}
                     className="text-sm text-gray-500 mb-3"
                   />
 
+                  {/* Payment & Transaction Info */}
+                  <p className="text-sm text-gray-500 mb-2">
+                    <span className="font-medium">Payment:</span> {booking.paymentMethod}
+                  </p>
+                  {booking.transactionId && (
+                    <p className="text-sm text-gray-500 mb-2">
+                      <span className="font-medium">Transaction ID:</span> {booking.transactionId}
+                    </p>
+                  )}
+
                   <div className="flex items-center justify-between mt-3">
                     <p className="text-lg font-semibold text-rose-500">₹{booking.price}</p>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => openConfirmModal(booking._id)}
-                      className="flex items-center gap-1"
-                    >
-                      <Trash2 className="w-4 h-4" /> Cancel
-                    </Button>
+                    {booking.status === "confirmed" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openConfirmModal(booking._id)}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" /> Cancel
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
-
               </Card>
             );
           })}
@@ -138,7 +147,7 @@ export default function BookingsPage() {
         </div>
       )}
 
-      {/* ✅ Confirmation Modal */}
+      {/* Confirmation Modal */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative animate-fadeIn">
@@ -167,7 +176,7 @@ export default function BookingsPage() {
         </div>
       )}
 
-      {/* ✅ Success Modal */}
+      {/* Success Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative animate-fadeIn">

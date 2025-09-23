@@ -27,7 +27,9 @@ const Services = lazy(() => import('./pages/ServicesPage'));
 
 import axios from 'axios';
 import ScrollToTop from './components/Layout/ScrollToTop';
-import ScrollToTopButton from './components/Layout/ScrollToTopButton';
+import ScrollToTopButton from './components/Layout/ScrollToTopButton'
+import BookingDetails from './pages/BookingDetailsPage';
+import BookingVerificationPage from './pages/BookingDetailsPage';
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 axios.defaults.withCredentials = true;
 
@@ -49,7 +51,7 @@ function App() {
               <Route path="/account/places/:id" element={<PlacesFormPage />} />
               <Route path="/place/:id" element={<PlacePage />} />
               <Route path="/account/bookings" element={<BookingsPage />} />
-              <Route path="/account/bookings/:id" element={<BookingPage />} />
+              <Route path="/account/bookings/:id" element={<BookingDetails/>} />
                <Route path="/payment" element={<PaymentReceipt />} />
                <Route path="/experiences" element={<ExperiencesPage />} />
                <Route path="/services" element={<Services />} />
@@ -57,6 +59,7 @@ function App() {
                <Route path="/service/:id" element={<ServicePage />} />
                <Route path="/become-host" element={<Dashboard/>}/>
                <Route path="/wishlist" element={<FavoritesPage/>}/>
+               <Route path="/verify" element={<BookingVerificationPage />} />
             </Route>
           </Routes>
           <Toaster />
