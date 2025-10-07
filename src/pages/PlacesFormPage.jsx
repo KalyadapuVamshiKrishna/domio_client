@@ -1,20 +1,68 @@
-import PhotosUploader from "../components/Places/PhotosUploader.jsx";
-import Perks from "../components/Places/Perks.jsx";
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
-import AccountNav from "../components/Account/AccountNav.jsx";
 import { Navigate, useParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, X, MapPin, Search } from "lucide-react";
+import { Trash2, X, MapPin, Search, UploadCloud, Wifi, ParkingSquare, UtensilsCrossed, Tv, Wind, PawPrint } from "lucide-react";
+
+// --- STANDARD LEAFLET.JS IMPORTS ---
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import PhotosUploader from './../components/PhotoUploader';
+
+
+
+
+const Perks = ({ selected, onChange }) => {
+  const perksList = [
+    { name: 'wifi', icon: <Wifi/>, label: 'Wi-Fi' },
+    { name: 'parking', icon: <ParkingSquare/>, label: 'Free parking' },
+    { name: 'kitchen', icon: <UtensilsCrossed/>, label: 'Kitchen' },
+    { name: 'tv', icon: <Tv/>, label: 'TV' },
+    { name: 'ac', icon: <Wind/>, label: 'Air Conditioning' },
+    { name: 'pets', icon: <PawPrint/>, label: 'Pets allowed' },
+  ];
+
+  function handleCbClick(ev) {
+    const { checked, name } = ev.target;
+    if (checked) {
+      onChange([...selected, name]);
+    } else {
+      onChange(selected.filter(selectedName => selectedName !== name));
+    }
+  }
+
+  return (
+    <>
+        {perksList.map(perk => (
+             <label key={perk.name} className="border p-4 flex rounded-2xl gap-2 items-center cursor-pointer">
+                <input type="checkbox" checked={selected.includes(perk.name)} name={perk.name} onChange={handleCbClick} />
+                {perk.icon}
+                <span>{perk.label}</span>
+             </label>
+        ))}
+    </>
+  );
+};
+
+
+// --- FIX FOR DEFAULT LEAFLET MARKER ICON ---
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+});
+
 
 export default function PlacesFormPage() {
   const { id } = useParams();
   const [title, setTitle] = useState("");
   const [address, setAddress] = useState("");
-  const [coordinates, setCoordinates] = useState({ lat: 40.7128, lng: -74.0060 }); // Default to NYC
+  const [coordinates, setCoordinates] = useState({ lat: 28.6139, lng: 77.2090 }); // Default: New Delhi
   const [addedPhotos, setAddedPhotos] = useState([]);
   const [description, setDescription] = useState("");
   const [perks, setPerks] = useState([]);
@@ -26,136 +74,97 @@ export default function PlacesFormPage() {
   const [redirect, setRedirect] = useState(false);
   const [confirmModal, setConfirmModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [errors, setErrors] = useState({});
 
-  // Google Maps state
-  const [map, setMap] = useState(null);
-  const [marker, setMarker] = useState(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const mapRef = useRef(null);
-  const searchBoxRef = useRef(null);
 
-  // Load Google Maps API
-  useEffect(() => {
-    if (window.google && window.google.maps) {
-      setIsMapLoaded(true);
-      return;
+  const reverseGeocode = useCallback(async (lat, lng) => {
+    try {
+      const { data } = await axios.get(`/reverse-geocode?lat=${lat}&lon=${lng}`);
+      setAddress(data.display_name || "Unknown location");
+    } catch (error) {
+      console.error("Reverse geocoding error:", error.response?.data || error.message);
+      setAddress("Could not fetch address");
     }
-
-    // Get API key from environment variables (for production) or use a placeholder
-    const apiKey = import.meta.env?.VITE_GOOGLE_MAPS_API_KEY || 
-                   (typeof process !== 'undefined' && process.env?.REACT_APP_GOOGLE_MAPS_API_KEY) || 
-                   'YOUR_API_KEY_HERE';
-    
-    if (apiKey === 'YOUR_API_KEY_HERE') {
-      console.error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY in your .env file');
-      alert('Google Maps API key not configured. Please contact the administrator.');
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setIsMapLoaded(true);
-    script.onerror = () => {
-      console.error('Failed to load Google Maps API');
-      alert('Failed to load Google Maps. Please check your API key configuration.');
-    };
-    document.head.appendChild(script);
-
-    return () => {
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    };
   }, []);
 
-  // Initialize map when loaded
   useEffect(() => {
-    if (!isMapLoaded || !mapRef.current || map) return;
-
-    const mapInstance = new window.google.maps.Map(mapRef.current, {
-      center: coordinates,
-      zoom: 13,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: true,
-      zoomControl: true,
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }]
-        }
-      ]
-    });
-
-    const markerInstance = new window.google.maps.Marker({
-      position: coordinates,
-      map: mapInstance,
-      draggable: true,
-      title: "Property Location"
-    });
-
-    // Handle marker drag
-    markerInstance.addListener('dragend', (event) => {
-      const lat = event.latLng.lat();
-      const lng = event.latLng.lng();
-      setCoordinates({ lat, lng });
-      
-      // Reverse geocoding to get address
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-          setAddress(results[0].formatted_address);
+    if (id) {
+      axios.get(`/places/${id}`, { withCredentials: true }).then((response) => {
+        const { data } = response;
+        setTitle(data.title);
+        setAddress(data.address);
+        setAddedPhotos(data.photos);
+        setDescription(data.description);
+        setPerks(data.perks);
+        setExtraInfo(data.extraInfo);
+        setCheckIn(data.checkIn);
+        setCheckOut(data.checkOut);
+        setMaxGuests(data.maxGuests);
+        setPrice(data.price);
+        if (data.coordinates && data.coordinates.lat && data.coordinates.lng) {
+          setCoordinates(data.coordinates);
         }
       });
-    });
+    } else {
+      reverseGeocode(coordinates.lat, coordinates.lng);
+    }
+  }, [id, reverseGeocode]);
 
-    // Handle map click
-    mapInstance.addListener('click', (event) => {
-      const lat = event.latLng.lat();
-      const lng = event.latLng.lng();
-      setCoordinates({ lat, lng });
-      markerInstance.setPosition({ lat, lng });
-      
-      // Reverse geocoding to get address
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-          setAddress(results[0].formatted_address);
-        }
-      });
-    });
-
-    setMap(mapInstance);
-    setMarker(markerInstance);
-  }, [isMapLoaded, coordinates, map]);
-
-  // Handle search
-  const handleSearch = () => {
-    if (!searchInput.trim() || !window.google) return;
-
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: searchInput }, (results, status) => {
-      if (status === 'OK' && results[0]) {
-        const location = results[0].geometry.location;
-        const lat = location.lat();
-        const lng = location.lng();
-        
+  function MapEvents() {
+    useMapEvents({
+      click(e) {
+        const { lat, lng } = e.latlng;
         setCoordinates({ lat, lng });
-        setAddress(results[0].formatted_address);
-        
-        if (map && marker) {
-          map.setCenter({ lat, lng });
-          map.setZoom(15);
-          marker.setPosition({ lat, lng });
-        }
+        reverseGeocode(lat, lng);
+      },
+    });
+    return null;
+  }
+
+  const DraggableMarker = () => {
+    const eventHandlers = useMemo(
+      () => ({
+        dragend(e) {
+          const { lat, lng } = e.target.getLatLng();
+          setCoordinates({ lat, lng });
+          reverseGeocode(lat, lng);
+        },
+      }),
+      [reverseGeocode],
+    );
+
+    return (
+      <Marker
+        draggable={true}
+        eventHandlers={eventHandlers}
+        position={[coordinates.lat, coordinates.lng]}
+      />
+    );
+  };
+  
+  function RecenterAutomatically({lat, lng}) {
+    const map = useMap();
+     useEffect(() => {
+       map.setView([lat, lng]);
+     }, [lat, lng, map]);
+     return null;
+  }
+
+  const handleSearch = async () => {
+    if (!address.trim()) return;
+    try {
+      const { data } = await axios.get(`/search-location?q=${encodeURIComponent(address)}`);
+      if (data && data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        setCoordinates({ lat: parseFloat(lat), lng: parseFloat(lon) });
+        setAddress(display_name);
       } else {
         alert('Location not found. Please try a different search term.');
       }
-    });
+    } catch (error) {
+      console.error("Geocoding search error:", error.response?.data || error.message);
+      alert('Failed to search for location. Please try again.');
+    }
   };
 
   const handleSearchKeyPress = (e) => {
@@ -165,42 +174,13 @@ export default function PlacesFormPage() {
     }
   };
 
-  useEffect(() => {
-    if (!id) return;
-    axios.get(`/places/${id}`, { withCredentials: true }).then((response) => {
-      const { data } = response;
-      setTitle(data.title);
-      setAddress(data.address);
-      setAddedPhotos(data.photos);
-      setDescription(data.description);
-      setPerks(data.perks);
-      setExtraInfo(data.extraInfo);
-      setCheckIn(data.checkIn);
-      setCheckOut(data.checkOut);
-      setMaxGuests(data.maxGuests);
-      setPrice(data.price);
-      
-      // Set coordinates if available
-      if (data.coordinates) {
-        setCoordinates(data.coordinates);
-      }
-    });
-  }, [id]);
-
-  // Update map when coordinates change from API
-  useEffect(() => {
-    if (map && marker && coordinates) {
-      map.setCenter(coordinates);
-      marker.setPosition(coordinates);
-    }
-  }, [map, marker, coordinates]);
-
   async function savePlace(ev) {
     ev.preventDefault();
+     setErrors({});
     const placeData = {
       title,
       address,
-      coordinates, // Include coordinates in save data
+      coordinates,
       photos: addedPhotos,
       description,
       perks,
@@ -211,17 +191,22 @@ export default function PlacesFormPage() {
       price,
     };
 
-    try {
-      if (id) {
-        await axios.put(`/places/${id}`, placeData, { withCredentials: true });
-      } else {
-        await axios.post("/places", placeData, { withCredentials: true });
-      }
-      setRedirect(true);
-    } catch (e) {
-      console.error("Save place error:", e.response?.data || e.message);
-      alert("Failed to save. Please try again.");
+     try {
+    if (id) {
+      await axios.put(`/places/${id}`, placeData, { withCredentials: true });
+    } else {
+      await axios.post("/places", placeData, { withCredentials: true });
     }
+    setRedirect(true);
+  } catch (e) {
+    console.error("Save place error:", e.response?.data || e.message);
+    if (e.response?.data?.details) {
+      // If backend sent field-level errors
+      setErrors(e.response.data.details);
+    } else {
+      alert(e.response?.data?.error || "Failed to save. Please try again.");
+    }
+  }
   }
 
   async function deletePlace() {
@@ -247,10 +232,10 @@ export default function PlacesFormPage() {
         className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-md mt-6 space-y-8"
         onSubmit={savePlace}
       >
-        {/* ✅ Title */}
+        {/* Title */}
         <div>
           <Label htmlFor="title" className="text-lg font-semibold mb-2 block">
-            Title <span  className="text-gray-500 text-sm font-normal">(Short and catchy)</span>
+            Title <span className="text-gray-500 text-sm font-normal">(Short and catchy)</span>
           </Label>
           <Input
             type="text"
@@ -259,51 +244,51 @@ export default function PlacesFormPage() {
             placeholder="My lovely apartment"
             required
           />
+          {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title[0]}</p>}
         </div>
 
-        {/* ✅ Location with Google Maps */}
+        {/* Location with Leaflet.js Map */}
         <div>
           <Label className="text-lg font-semibold mb-2 block">
             Location <span className="text-gray-500 text-sm font-normal">(Search and pin your exact location)</span>
           </Label>
           
-          {/* Search Input */}
           <div className="flex gap-2 mb-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 type="text"
-                value={searchInput}
-                onChange={(ev) => setSearchInput(ev.target.value)}
+                value={address}
+                onChange={(ev) => setAddress(ev.target.value)}
                 onKeyPress={handleSearchKeyPress}
-                placeholder="Search for a location..."
+                placeholder="Search for an address..."
                 className="pl-10"
               />
+              {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address[0]}</p>}
             </div>
             <Button type="button" onClick={handleSearch} variant="outline">
               Search
             </Button>
           </div>
 
-          {/* Google Maps */}
+          {/* Leaflet Map */}
           <div className="border rounded-lg overflow-hidden mb-3">
-            <div 
-              ref={mapRef}
-              className="w-full h-80"
-              style={{ minHeight: '320px' }}
-            >
-              {!isMapLoaded && (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                  <div className="text-center">
-                    <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">Loading map...</p>
-                  </div>
-                </div>
-              )}
-            </div>
+             <MapContainer 
+               center={[coordinates.lat, coordinates.lng]} 
+               zoom={13} 
+               scrollWheelZoom={false} 
+               className="w-full h-80"
+             >
+                <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <DraggableMarker />
+                <MapEvents />
+                <RecenterAutomatically lat={coordinates.lat} lng={coordinates.lng} />
+            </MapContainer>
           </div>
 
-          {/* Selected Address Display */}
           <div className="bg-gray-50 p-3 rounded-lg">
             <Label className="text-sm font-medium text-gray-600">Selected Address:</Label>
             <p className="text-sm text-gray-800 mt-1">
@@ -317,20 +302,20 @@ export default function PlacesFormPage() {
           </div>
 
           <p className="text-gray-500 text-xs mt-2">
-            💡 Tip: Search for your location, then drag the red pin or click on the map for precise positioning
+            💡 Tip: Type an address and search, or drag the pin for precise positioning.
           </p>
         </div>
 
-        {/* ✅ Photos */}
-        <div>
+        {/* Photos */}
+         <div>
           <Label className="text-lg font-semibold mb-2 block">Photos</Label>
           <p className="text-gray-500 text-sm mb-3">Add more photos for better visibility</p>
           <PhotosUploader addedPhotos={addedPhotos} onChange={setAddedPhotos} />
         </div>
 
-        {/* ✅ Description */}
+        {/* Description */}
         <div>
-          <Label  htmlFor="description" className="text-lg font-semibold mb-2 block">Description</Label>
+          <Label htmlFor="description" className="text-lg font-semibold mb-2 block">Description</Label>
           <Textarea
             value={description}
             id="description"
@@ -339,18 +324,20 @@ export default function PlacesFormPage() {
             rows={5}
             required
           />
+          {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description[0]}</p>}
         </div>
 
-        {/* ✅ Perks */}
+        {/* Perks */}
         <div>
           <Label className="text-lg font-semibold mb-2 block">Perks</Label>
           <p className="text-gray-500 text-sm mb-3">Select all perks available at your place</p>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2 mt-2">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 mt-2">
             <Perks selected={perks} onChange={setPerks} />
           </div>
+          {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description[0]}</p>}
         </div>
 
-        {/* ✅ Extra Info */}
+        {/* Extra Info */}
         <div>
           <Label className="text-lg font-semibold mb-2 block">Extra info</Label>
           <p className="text-gray-500 text-sm mb-3">House rules, additional info, etc.</p>
@@ -362,7 +349,7 @@ export default function PlacesFormPage() {
           />
         </div>
 
-        {/* ✅ Check-in/out & Price */}
+        {/* Check-in/out & Price */}
         <div>
           <Label className="text-lg font-semibold mb-2 block">
             Check-in & out times
@@ -380,6 +367,7 @@ export default function PlacesFormPage() {
                 placeholder="14"
                 required
               />
+              {errors.checkIn && <p className="text-red-500 text-sm mt-1">{errors.checkIn[0]}</p>}
             </div>
             <div>
               <Label>Check out</Label>
@@ -390,6 +378,8 @@ export default function PlacesFormPage() {
                 placeholder="11"
                 required
               />
+              {errors.checkOut && <p className="text-red-500 text-sm mt-1">{errors.checkOut[0]}</p>}
+
             </div>
             <div>
               <Label>Max guests</Label>
@@ -400,6 +390,8 @@ export default function PlacesFormPage() {
                 min={1}
                 required
               />
+              {errors.maxGuests && <p className="text-red-500 text-sm mt-1">{errors.maxGuests[0]}</p>}
+
             </div>
             <div>
               <Label>Price per night</Label>
@@ -410,12 +402,13 @@ export default function PlacesFormPage() {
                 min={1}
                 required
               />
+              {errors.price && <p className="text-red-500 text-sm mt-1">{errors.price[0]}</p>}
             </div>
           </div>
         </div>
 
-        {/* ✅ Buttons */}
-        <div className="flex justify-between items-center">
+        {/* Buttons */}
+        <div className="flex justify-between items-center pt-4">
           {id && (
             <Button
               variant="destructive"
@@ -427,25 +420,36 @@ export default function PlacesFormPage() {
             </Button>
           )}
           <Button
-            className="px-6 py-3 text-base font-semibold rounded-lg bg-rose-500 hover:bg-rose-600 text-white"
+            className="px-6 py-3 text-base font-semibold rounded-lg bg-rose-500 hover:bg-rose-600 text-white ml-auto"
             type="submit"
           >
             Save Place
           </Button>
+          {Object.keys(errors).length > 0 && (
+              <div className="bg-red-50 border border-red-300 text-red-700 p-3 rounded-lg mt-4">
+                <p className="font-semibold mb-1">Please fix the following errors:</p>
+                <ul className="list-disc list-inside text-sm">
+                  {Object.entries(errors).map(([field, messages]) => (
+                    <li key={field}>{messages[0]}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
         </div>
       </form>
 
-      {/* ✅ Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {confirmModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-lg relative">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-lg relative animate-in zoom-in-95">
             <button
               onClick={() => setConfirmModal(false)}
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
-            <h3 className="text-lg font-semibold mb-4 text-red-600">Delete Place?</h3>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Confirm Deletion</h3>
             <p className="text-gray-600 mb-6">
               Are you sure you want to delete this place? This action cannot be undone.
             </p>

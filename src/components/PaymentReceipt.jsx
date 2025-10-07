@@ -44,18 +44,16 @@ export default function PaymentReceipt() {
     paymentMethod = "Test Gateway",
   } = locationState;
 
-  // Calculate pricing to match backend logic
+ 
   const calculatePricing = () => {
     const basePrice = Number(totalPrice) || 0;
     
-    // For experiences/services, totalPrice already includes numberOfGuests multiplication
-    // For places, totalPrice is calculated for all nights
+    
     let subtotal = basePrice;
     
-    // Recalculate to match backend exactly
+ 
     if (type !== "place") {
-      // For experiences/services, if totalPrice doesn't include guests, multiply
-      // This assumes the BookingWidget sends the total correctly
+      
       subtotal = basePrice;
     }
     
