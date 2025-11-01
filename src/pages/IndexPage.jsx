@@ -298,7 +298,7 @@ export default function IndexPage() {
                 <h3 className="font-semibold truncate">{place.title}</h3>
                 <p className="text-sm text-gray-500 truncate">{place.address}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="font-semibold">{formatPrice(place.price)}</span>
+                  <span className="font-semibold">{formatPrice(place.price)}<span className="font-light text-sm"> /night</span></span>
                   <div className="flex items-center text-sm">
                     <Star className="text-yellow-500 w-4 h-4 mr-1" />
                     {place.rating ? place.rating.toFixed(1) : "4.8"}
