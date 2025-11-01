@@ -29,7 +29,7 @@ import axios from 'axios';
 import ScrollToTop from './components/Layout/ScrollToTop';
 import ScrollToTopButton from './components/Layout/ScrollToTopButton'
 import BookingDetails from './pages/BookingDetailsPage';
-import BookingVerificationPage from './pages/BookingDetailsPage';
+import VerifyBookingPage from './components/Booking/BookingVerify';
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 axios.defaults.withCredentials = true;
 
@@ -62,7 +62,7 @@ function App() {
                <Route path="/service/:id" element={<ServicePage />} />
                <Route path="/become-host" element={<Dashboard/>}/>
                <Route path="/wishlist" element={<FavoritesPage/>}/>
-               <Route path="/verify" element={<BookingVerificationPage />} />
+               <Route path="/verify" element={<VerifyBookingPage />} />
             </Route>
           </Routes>
           <Toaster />

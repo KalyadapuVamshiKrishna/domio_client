@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { format } from "date-fns";
 
-// shadcn/ui components
+// shadcn/ui components (No changes to these imports or how they are used)
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -11,21 +11,26 @@ import { AlertCircle, CheckCircle } from "lucide-react";
 
 export default function VerifyBookingPage() {
   const [searchParams] = useSearchParams();
-  const bookingId = searchParams.get("booking"); // now using bookingId from URL
+
+  // 🟢 FIX 1: Read the Transaction ID ('tx') from the URL
+  const transactionId = searchParams.get("tx");
+
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!bookingId) {
-      setError("Booking ID missing in URL.");
+    // Check for transaction ID instead of booking ID
+    if (!transactionId) {
+      setError("Transaction ID missing in URL.");
       setLoading(false);
       return;
     }
 
     const fetchBooking = async () => {
       try {
-        const res = await axios.get(`/bookings/verify?booking=${bookingId}`);
+        // 🟢 FIX 2: Use 'tx' for the API query parameter
+        const res = await axios.get(`/bookings/verify?tx=${transactionId}`);
         if (res.data?.success) {
           setBooking(res.data.booking);
         } else {
@@ -40,7 +45,8 @@ export default function VerifyBookingPage() {
     };
 
     fetchBooking();
-  }, [bookingId]);
+    // 🟢 FIX 3: Update dependency array to transactionId
+  }, [transactionId]);
 
   if (loading)
     return <p className="text-center mt-20 text-gray-600">Loading booking details...</p>;
@@ -53,22 +59,21 @@ export default function VerifyBookingPage() {
       </div>
     );
 
-  // Booking info
+  // 🟢 FIX 4: Correctly destructure all required fields from the fetched booking object
   const {
-    transactionId,
+    _id: bookingId, // Use the fetched _id as the bookingId
     numberOfGuests,
     name,
     phone,
     paymentMethod,
-    totalPrice,
+    price: totalPrice, // Assuming 'price' in the backend is the subtotal
+    serviceFee, // Already included in the backend response
+    totalAmount: grandTotal, // Assuming 'totalAmount' is the final amount
     checkIn,
     checkOut,
     date,
     itemTitle,
   } = booking;
-
-  const serviceFee = Math.max(50, Math.round(totalPrice * 0.05));
-  const grandTotal = totalPrice + serviceFee;
 
   const formatCurrency = (amt) => `₹${(Number(amt) || 0).toLocaleString()}`;
 
@@ -81,13 +86,9 @@ export default function VerifyBookingPage() {
               <CheckCircle className="text-green-600" />
               <div>
                 <CardTitle>Booking Verified</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Booking ID: #{bookingId}
-                </p>
+                <p className="text-sm text-muted-foreground">Booking ID: #{bookingId}</p>
                 {transactionId && (
-                  <p className="text-xs text-muted-foreground">
-                    Transaction: #{transactionId}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Transaction: #{transactionId}</p>
                 )}
               </div>
             </div>
@@ -101,10 +102,13 @@ export default function VerifyBookingPage() {
             <div className="space-y-3">
               <h3 className="text-sm font-semibold">Booking Summary</h3>
               <div className="text-sm text-muted-foreground">
-                <p><strong>{itemTitle}</strong></p>
+                <p>
+                  <strong>{itemTitle}</strong>
+                </p>
                 {checkIn && checkOut ? (
                   <p>
-                    {format(new Date(checkIn), "dd MMM yyyy")} — {format(new Date(checkOut), "dd MMM yyyy")}
+                    {format(new Date(checkIn), "dd MMM yyyy")} —{" "}
+                    {format(new Date(checkOut), "dd MMM yyyy")}
                   </p>
                 ) : date ? (
                   <p>{format(new Date(date), "dd MMM yyyy")}</p>

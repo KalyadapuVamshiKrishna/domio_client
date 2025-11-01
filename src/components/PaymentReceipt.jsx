@@ -146,9 +146,10 @@ export default function PaymentReceipt() {
   };
 
   // ===== QR code value =====
-  const qrValue = transactionId
-    ? `${window.location.origin}/verify?tx=${transactionId}`
-    : `${window.location.origin}`;
+ // PaymentReceipt.jsx
+ const qrValue = transactionId
+      ? `${window.location.origin}/verify?tx=${transactionId}`
+     : `${window.location.origin}`;
 
   // ===== PDF Download =====
   const downloadPDF = () => {

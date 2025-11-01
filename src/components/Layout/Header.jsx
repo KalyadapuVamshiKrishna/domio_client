@@ -77,7 +77,7 @@ export default function Header() {
       try {
         let endpoint = '';
         
-        // Determine API endpoint based on current tab
+        
         switch (pathname) {
           case '/':
             endpoint = `/places?search=${debouncedLocation}`;
@@ -95,7 +95,7 @@ export default function Header() {
         const res = await axios.get(endpoint);
         setSearchResults(res.data);
         
-        // Auto-navigate with search params based on current tab
+      
         const params = new URLSearchParams({
           location: debouncedLocation,
           checkIn,
@@ -103,7 +103,7 @@ export default function Header() {
           guests,
         }).toString();
         
-        // Navigate to current tab with search params
+        
         navigate(`${pathname}?${params}`, { replace: true });
         
       } catch (err) {
@@ -115,7 +115,7 @@ export default function Header() {
     fetchListings();
   }, [debouncedLocation, pathname, checkIn, checkOut, guests, navigate]);
 
-  // Initialize search params from URL on component mount
+  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const location = urlParams.get('location') || '';
