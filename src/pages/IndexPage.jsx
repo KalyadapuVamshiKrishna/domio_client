@@ -85,11 +85,11 @@ export default function IndexPage() {
   const queryCheckOut = searchParams.get("checkOut") || "";
   const queryGuests = searchParams.get("guests") || "";
 
-  // 🔄 Fetch places function
+ 
   const fetchPlaces = useCallback(
     async (pageToFetch = 1, append = false) => {
       if (fetchingRef.current) return;
-      fetchingRef.current = true;
+      fetchingRef.current = true;  // gaurd clause
 
       if (pageToFetch === 1) {
         setLoading(true);
@@ -115,11 +115,11 @@ export default function IndexPage() {
         });
        
 
-        const fetchedPlaces = Array.isArray(res.data.places) ? res.data.places : [];
+        const fetchedPlaces = Array.isArray(res.data.places) ? res.data.places : []; // Ensure it's an array
 
         const enrichedPlaces = fetchedPlaces.map((p) => ({
           ...p,
-          isFavorite: user?.wishlist?.includes(p._id.toString()) ?? false,
+          isFavorite: user?.wishlist?.includes(p._id.toString()) ?? false, // check if in user's wishlist
         }));
         setPlaces((prev) => (append ? [...prev, ...enrichedPlaces] : enrichedPlaces));
         setHasMore(fetchedPlaces.length >= limit);
@@ -143,27 +143,27 @@ export default function IndexPage() {
   };
 
   useEffect(() => {
-    if (!user) return; // no user, nothing to do
+    if (!user) return; 
   
     if (user.wishlist?.length) {
-      markWishlist(user.wishlist); // mark isFavorite for existing places
+      markWishlist(user.wishlist); 
     }
   }, [user]);
   
 
-  // 🔄 Initial fetch & fetch when filters change
+
   useEffect(() => {
     setPage(1);
     fetchPlaces(1, false);
   }, [fetchPlaces]);
 
-  // 🔄 Fetch next page
+
   useEffect(() => {
     if (page === 1) return;
     fetchPlaces(page, true);
   }, [page, fetchPlaces]);
 
-  // 🔄 Infinite scroll
+  
   useEffect(() => {
     if (pageLoading || loading) return;
     if (!hasMore) return;
@@ -184,7 +184,7 @@ export default function IndexPage() {
     };
   }, [pageLoading, loading, hasMore]);
 
-  // ✅ Wishlist toggle (login required)
+
   const toggleFavorite = async (placeId) => {
     if (!user) {
       alert("Please login to add to wishlist");
@@ -206,7 +206,7 @@ export default function IndexPage() {
 
   const formatPrice = (p) => (p == null ? "N/A" : `₹${p.toLocaleString("en-IN")}`);
 
-  // 🔄 UI
+  
   if (loading && places.length === 0) {
     return (
       <div className="mt-20 max-w-7xl mx-auto px-6">

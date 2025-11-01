@@ -3,7 +3,9 @@ import Header from "./Header";
 
 export default function Layout() {
   const location = useLocation();
-  const hideHeaderPaths = ["/login", "/register"];
+  const hideHeaderPaths = ["/login", "/register", "/payment","/account/places/new",
+  "/account/places/:id",
+  "/verify" ];
   const shouldShowHeader = !hideHeaderPaths.includes(location.pathname);
 
   return (

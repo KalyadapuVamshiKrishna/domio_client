@@ -47,36 +47,42 @@ export default function BookingWidget({ item, type }) {
   const grandTotal = totalPrice + serviceFee;
 
   function handleProceedToPayment() {
-    if (type === "place" && (!checkIn || !checkOut)) {
-      return alert("Please select check-in and check-out dates.");
-    }
-    if (type !== "place" && !selectedDate) {
-      return alert("Please select a date.");
-    }
-    if (!phone.trim() || !name.trim()) {
-      return alert("Please fill in all details.");
-    }
-
-    // Normally you'd create a booking and initiate payment via API here.
-    // Instead, we'll navigate to the PaymentReceipt page with all necessary info.
-    const state = {
-      type,
-      itemId: item._id,
-      itemTitle: item.title || item.name,
-      checkIn: checkIn ? checkIn.toISOString() : null,
-      checkOut: checkOut ? checkOut.toISOString() : null,
-      selectedDate: selectedDate ? selectedDate.toISOString() : null,
-      numberOfGuests,
-      name,
-      phone,
-      totalPrice: grandTotal,
-      userName: user?.name || name,
-      userEmail: user?.email || "",
-      paymentMethod: "Test Gateway",
-    };
-
-    navigate("/payment", { state });
+  // Check if user is not signed in
+  if (!user) {
+    alert("Please sign in to continue.");
+    navigate("/login");
+    return;
   }
+
+  if (type === "place" && (!checkIn || !checkOut)) {
+    return alert("Please select check-in and check-out dates.");
+  }
+  if (type !== "place" && !selectedDate) {
+    return alert("Please select a date.");
+  }
+  if (!phone.trim() || !name.trim()) {
+    return alert("Please fill in all details.");
+  }
+
+  const state = {
+    type,
+    itemId: item._id,
+    itemTitle: item.title || item.name,
+    checkIn: checkIn ? checkIn.toISOString() : null,
+    checkOut: checkOut ? checkOut.toISOString() : null,
+    selectedDate: selectedDate ? selectedDate.toISOString() : null,
+    numberOfGuests,
+    name,
+    phone,
+    totalPrice: grandTotal,
+    userName: user?.name || name,
+    userEmail: user?.email || "",
+    paymentMethod: "Test Gateway",
+  };
+
+  navigate("/payment", { state });
+}
+
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 max-w-4xl mx-auto border border-gray-200">
