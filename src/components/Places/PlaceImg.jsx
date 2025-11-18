@@ -1,13 +1,24 @@
 import Image from "../../Image.jsx";
 
-export default function PlaceImg({ place, index = 0, className = "object-cover rounded-2xl" }) {
-  if (!place?.photos?.length) return null;
+export default function PlaceImg({ place, className }) {
+  // Null-safe fallback
+  if (!place || !place.photos || place.photos.length === 0) {
+    return (
+      <div
+        className={`bg-gray-200 flex items-center justify-center text-gray-500 ${className}`}
+      >
+        No Image
+      </div>
+    );
+  }
 
+  // Normal render
   return (
-    <Image
+    <img
+      src={place.photos[0]}
+      alt={place.title || "Place"}
       className={className}
-      src={place.photos[index]}
-      alt={place.title || "Place image"}
     />
   );
 }
+

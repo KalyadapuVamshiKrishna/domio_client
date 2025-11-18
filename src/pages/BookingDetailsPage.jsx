@@ -1,5 +1,7 @@
 // src/pages/BookingDetailsPage.jsx
 
+// src/pages/BookingDetailsPage.jsx
+
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Navigate, useParams } from "react-router-dom";
@@ -141,7 +143,7 @@ export default function BookingDetailsPage() {
     }
   }
 
-  if (redirect) return <Navigate to={"/account/places"} />;
+  if (redirect) return <Navigate to={'/account/places'} />;
 
   return (
     <div className="px-4 py-16 sm:px-6 lg:px-8">

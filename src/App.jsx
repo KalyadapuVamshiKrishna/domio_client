@@ -11,7 +11,7 @@ import Dashboard from './components/Account/BecomeAHost';
 import FavoritesPage from './pages/FavouritesPage';
 
 
-// Lazy load pages for better performance
+
 const IndexPage = lazy(() => import('./pages/IndexPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
