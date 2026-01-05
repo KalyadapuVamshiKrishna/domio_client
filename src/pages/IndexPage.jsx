@@ -89,7 +89,7 @@ export default function IndexPage() {
   const fetchPlaces = useCallback(
     async (pageToFetch = 1, append = false) => {
       if (fetchingRef.current) return;
-      fetchingRef.current = true;  // gaurd clause
+      fetchingRef.current = true;  
 
       if (pageToFetch === 1) {
         setLoading(true);
@@ -121,7 +121,17 @@ export default function IndexPage() {
           ...p,
           isFavorite: user?.wishlist?.includes(p._id.toString()) ?? false, // check if in user's wishlist
         }));
-        setPlaces((prev) => (append ? [...prev, ...enrichedPlaces] : enrichedPlaces));
+        setPlaces((prev) => {
+            if (!append) return enrichedPlaces;
+
+            // Create a Map of existing items to prevent duplicates
+            const existingIds = new Set(prev.map((p) => p._id.toString()));
+            const uniqueNewPlaces = enrichedPlaces.filter(
+              (p) => !existingIds.has(p._id.toString())
+            );
+
+            return [...prev, ...uniqueNewPlaces];
+          });
         setHasMore(fetchedPlaces.length >= limit);
       } catch (err) {
         console.error("Failed to fetch places:", err);
@@ -165,24 +175,25 @@ export default function IndexPage() {
 
   
   useEffect(() => {
-    if (pageLoading || loading) return;
-    if (!hasMore) return;
+  // DON'T trigger if we are already loading or if there's no more data
+  if (pageLoading || loading || !hasMore) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setPage((prev) => prev + 1);
-        }
-      },
-      { rootMargin: "200px" }
-    );
+  const observer = new IntersectionObserver(
+    (entries) => {
+      // Only increment page if the user is at the bottom AND we aren't already fetching
+      if (entries[0].isIntersecting && !fetchingRef.current) {
+        setPage((prev) => prev + 1);
+      }
+    },
+    { rootMargin: "400px" } // Increased margin for smoother loading
+  );
 
-    if (listEndRef.current) observer.observe(listEndRef.current);
+  if (listEndRef.current) observer.observe(listEndRef.current);
 
-    return () => {
-      if (listEndRef.current) observer.unobserve(listEndRef.current);
-    };
-  }, [pageLoading, loading, hasMore]);
+  return () => {
+    if (listEndRef.current) observer.unobserve(listEndRef.current);
+  };
+}, [pageLoading, loading, hasMore]);
 
 
   const toggleFavorite = async (placeId) => {
@@ -260,9 +271,10 @@ export default function IndexPage() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {places.map((place) => (
+        {places.map((place, index) => (
           <motion.div
-            key={place._id}
+            // Use the ID, but fallback to index if data is messy (temporary safety)
+            key={`${place._id}-${index}`} 
             layout
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}

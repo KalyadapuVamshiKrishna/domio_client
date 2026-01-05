@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, AlertCircle } from "lucide-react"; // Import AlertCircle
 import { cn } from "@/lib/utils";
 
 export default function BookingWidget({ item, type }) {
@@ -24,7 +24,9 @@ export default function BookingWidget({ item, type }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  
+  // ✅ New Error State
+  const [error, setError] = useState(null);
 
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
@@ -32,6 +34,11 @@ export default function BookingWidget({ item, type }) {
   useEffect(() => {
     if (user) setName(user.name);
   }, [user]);
+
+  // ✅ Auto-clear error when user interacts with inputs
+  useEffect(() => {
+    setError(null);
+  }, [checkIn, checkOut, selectedDate, numberOfGuests, name, phone]);
 
   const numberOfNights =
     type === "place" && checkIn && checkOut
@@ -47,46 +54,59 @@ export default function BookingWidget({ item, type }) {
   const grandTotal = totalPrice + serviceFee;
 
   function handleProceedToPayment() {
-  // Check if user is not signed in
-  if (!user) {
-    alert("Please sign in to continue.");
-    navigate("/login");
-    return;
-  }
+    setError(null);
 
-  if (type === "place" && (!checkIn || !checkOut)) {
-    return alert("Please select check-in and check-out dates.");
-  }
-  if (type !== "place" && !selectedDate) {
-    return alert("Please select a date.");
-  }
-  if (!phone.trim() || !name.trim()) {
-    return alert("Please fill in all details.");
-  }
+    // 1. Validation: Authentication
+    if (!user) {
+      setError("Please sign in to book this place.");
+      // Optional: You could redirect after a delay, but showing the error first is better UX
+      setTimeout(() => navigate("/login"), 2000); 
+      return;
+    }
 
-  const state = {
-    type,
-    itemId: item._id,
-    itemTitle: item.title || item.name,
-    checkIn: checkIn ? checkIn.toISOString() : null,
-    checkOut: checkOut ? checkOut.toISOString() : null,
-    selectedDate: selectedDate ? selectedDate.toISOString() : null,
-    numberOfGuests,
-    name,
-    phone,
-    totalPrice: grandTotal,
-    userName: user?.name || name,
-    userEmail: user?.email || "",
-    paymentMethod: "Test Gateway",
-  };
+    // 2. Validation: Dates
+    if (type === "place" && (!checkIn || !checkOut)) {
+      setError("Please select both check-in and check-out dates.");
+      return;
+    }
+    if (type !== "place" && !selectedDate) {
+      setError("Please select a date for your booking.");
+      return;
+    }
 
-  navigate("/payment", { state });
-}
+    // 3. Validation: Personal Info
+    if (!name.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Please enter your phone number.");
+      return;
+    }
 
+    // 4. Success -> Navigate
+    const state = {
+      type,
+      itemId: item._id,
+      itemTitle: item.title || item.name,
+      checkIn: checkIn ? checkIn.toISOString() : null,
+      checkOut: checkOut ? checkOut.toISOString() : null,
+      selectedDate: selectedDate ? selectedDate.toISOString() : null,
+      numberOfGuests,
+      name,
+      phone,
+      totalPrice: grandTotal,
+      userName: user?.name || name,
+      userEmail: user?.email || "",
+      paymentMethod: "Test Gateway",
+    };
+
+    navigate("/payment", { state });
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 max-w-4xl mx-auto border border-gray-200">
-      {/* Price */}
+      {/* Price Header */}
       <div className="text-center mb-6">
         <span className="text-2xl font-semibold">₹{item.price}</span>{" "}
         <span className="text-gray-500 text-sm">
@@ -94,7 +114,7 @@ export default function BookingWidget({ item, type }) {
         </span>
       </div>
 
-      {/* Date Selection */}
+      {/* Date Selection Logic */}
       {type === "place" ? (
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           {/* Check-in */}
@@ -109,7 +129,9 @@ export default function BookingWidget({ item, type }) {
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal truncate",
-                    !checkIn && "text-muted-foreground"
+                    !checkIn && "text-muted-foreground",
+                    // Add red border if validation fails specifically on dates
+                    error && error.includes("check-in") && "border-red-500"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -143,7 +165,8 @@ export default function BookingWidget({ item, type }) {
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal truncate",
-                    !checkOut && "text-muted-foreground"
+                    !checkOut && "text-muted-foreground",
+                    error && error.includes("check-out") && "border-red-500"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -176,7 +199,8 @@ export default function BookingWidget({ item, type }) {
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal truncate",
-                  !selectedDate && "text-muted-foreground"
+                  !selectedDate && "text-muted-foreground",
+                  error && error.includes("date") && "border-red-500"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -210,13 +234,34 @@ export default function BookingWidget({ item, type }) {
       <div className="mb-4 space-y-3">
         <div>
           <label className="block mb-1 font-medium text-sm">Full Name</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" />
+          <Input 
+            value={name} 
+            onChange={(e) => setName(e.target.value)} 
+            placeholder="John Doe"
+            // Highlight if error mentions "name"
+            className={error && error.toLowerCase().includes("name") ? "border-red-500" : ""}
+          />
         </div>
         <div>
           <label className="block mb-1 font-medium text-sm">Phone</label>
-          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
+          <Input 
+            type="tel" 
+            value={phone} 
+            onChange={(e) => setPhone(e.target.value)} 
+            placeholder="+91 98765 43210" 
+            // Highlight if error mentions "phone"
+            className={error && error.toLowerCase().includes("phone") ? "border-red-500" : ""}
+          />
         </div>
       </div>
+      
+      {/* ✅ Error Banner: Only shows if error exists */}
+      {error && (
+        <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Proceed Button */}
       <Button
@@ -225,10 +270,8 @@ export default function BookingWidget({ item, type }) {
         disabled={loading}
       >
         {loading ? "Processing..." : "Proceed to Pay"}{" "}
-        {grandTotal > 0 && <span className="font-bold">₹{grandTotal}</span>}
+        {grandTotal > 0 && <span className="font-bold ml-1">₹{grandTotal}</span>}
       </Button>
-
-      {message && <p className="text-center mt-4 text-sm text-gray-600">{message}</p>}
     </div>
   );
 }

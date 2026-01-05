@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Navigate, useParams } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Trash2, AlertCircle, Loader2 } from "lucide-react"; // Added Icons
 
 import PlaceFormSection from "../components/forms/PlaceFormSection";
 import Perks from "../components/Perks";
@@ -12,9 +12,9 @@ import PhotosUploader from "../components/PhotoUploader";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+// Leaflet setup...
 import L from "leaflet";
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -42,12 +42,19 @@ export default function PlacesFormPage() {
   const [checkOut, setCheckOut] = useState("");
   const [maxGuests, setMaxGuests] = useState(1);
   const [price, setPrice] = useState(1000);
+  
+  // ✅ Status States
   const [redirect, setRedirect] = useState(false);
   const [confirmModal, setConfirmModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false); // New: Prevents double submit
+  const [isLoading, setIsLoading] = useState(!!id); // New: Show loader on init
+  
+  // ✅ Error States
+  const [errors, setErrors] = useState({}); // Field-specific errors
+  const [globalError, setGlobalError] = useState(null); // General API errors
 
-  // ✅ Reverse Geocode (server-based fallback)
+  // ✅ Reverse Geocode
   const reverseGeocode = useCallback(async (lat, lng) => {
     try {
       const { data } = await axios.get(`/reverse-geocode?lat=${lat}&lon=${lng}`);
@@ -58,15 +65,18 @@ export default function PlacesFormPage() {
         setCountry(data.country || "");
       }
     } catch (error) {
-      console.error("Reverse geocoding error:", error.response?.data || error.message);
-      setAddress("Could not fetch address");
+      console.error("Reverse geocoding error:", error);
+      // Don't block the user, just log it
     }
   }, []);
 
   // ✅ Load data if editing
   useEffect(() => {
-    if (id) {
-      axios.get(`/places/${id}`, { withCredentials: true }).then((response) => {
+    if (!id) return;
+    
+    setIsLoading(true);
+    axios.get(`/places/${id}`, { withCredentials: true })
+      .then((response) => {
         const { data } = response;
         setTitle(data.title);
         setAddress(data.address);
@@ -81,36 +91,53 @@ export default function PlacesFormPage() {
         setCity(data.city || "");
         setState(data.state || "");
         setCountry(data.country || "");
-
         if (data.coordinates?.lat && data.coordinates?.lng) {
           setCoordinates(data.coordinates);
         }
-      });
-    } else {
-      reverseGeocode(coordinates.lat, coordinates.lng);
-    }
-  }, [id, reverseGeocode]);
+      })
+      .catch(err => {
+         setGlobalError("Failed to load place details. Please refresh.");
+      })
+      .finally(() => setIsLoading(false));
+  }, [id]);
+
+  // ✅ Client-side Validation
+  function validateForm() {
+    const newErrors = {};
+    if (!title.trim()) newErrors.title = ["Title is required"];
+    if (!address.trim()) newErrors.address = ["Address is required"];
+    if (addedPhotos.length < 3) newErrors.photos = ["Add at least 3 photos"];
+    if (!description.trim()) newErrors.description = ["Description is required"];
+    if (!checkIn) newErrors.checkIn = ["Check-in time is required"];
+    if (!checkOut) newErrors.checkOut = ["Check-out time is required"];
+    if (price < 1) newErrors.price = ["Price must be positive"];
+    if (maxGuests < 1) newErrors.maxGuests = ["Guests must be at least 1"];
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
 
   // ✅ Save place (POST/PUT)
   async function savePlace(ev) {
     ev.preventDefault();
+    setGlobalError(null);
     setErrors({});
 
+    // 1. Run Client Validation
+    if (!validateForm()) {
+      setGlobalError("Please fix the highlighted errors below.");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsSaving(true);
+
     const placeData = {
-      title,
-      address,
-      coordinates,
-      photos: addedPhotos,
-      description,
-      perks,
-      extraInfo,
-      checkIn,
-      checkOut,
+      title, address, coordinates, photos: addedPhotos,
+      description, perks, extraInfo, checkIn, checkOut,
       maxGuests: Number(maxGuests),
       price: Number(price),
-      city,
-      state,
-      country,
+      city, state, country,
     };
 
     try {
@@ -121,12 +148,22 @@ export default function PlacesFormPage() {
       }
       setRedirect(true);
     } catch (e) {
-      console.error("Save place error:", e.response?.data || e.message);
-      if (e.response?.data?.details) {
-        setErrors(e.response.data.details);
+      console.error("Save Error:", e);
+      
+      // 2. Handle Server Validation Errors (400/422)
+      if (e.response && (e.response.status === 400 || e.response.status === 422)) {
+        if (e.response.data.details) {
+            setErrors(e.response.data.details); // Assuming backend sends { details: { title: "Error" } }
+        } else {
+             setGlobalError(e.response.data.error || "Validation failed.");
+        }
       } else {
-        alert(e.response?.data?.error || "Failed to save. Please try again.");
+        // 3. Handle Network/Server Crash (500)
+        setGlobalError("Something went wrong on our end. Please try again later.");
       }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -138,60 +175,58 @@ export default function PlacesFormPage() {
       await axios.delete(`/places/${id}`, { withCredentials: true });
       setRedirect(true);
     } catch (error) {
-      console.error("Error deleting place:", error);
-      alert("Failed to delete. Please try again.");
+      setGlobalError("Failed to delete place. It might be booked.");
+      setConfirmModal(false);
     } finally {
       setIsDeleting(false);
-      setConfirmModal(false);
     }
   }
 
   if (redirect) return <Navigate to="/account/places" />;
 
+  // Loading State
+  if (isLoading) {
+      return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin w-10 h-10 text-rose-500" /></div>;
+  }
+
   return (
-    <div className="px-4 py-16 sm:px-6 lg:px-8">
-      <form
-        className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-md mt-6 space-y-8"
-        onSubmit={savePlace}
-      >
-        {/* Title Section */}
+    <div className="px-4 py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+      
+      {/* ✅ Global Error Banner */}
+      {globalError && (
+        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <p className="font-medium">{globalError}</p>
+        </div>
+      )}
+
+      <form className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 space-y-8" onSubmit={savePlace}>
+        
+        {/* Title */}
         <PlaceFormSection title="Title" subtitle="(Short and catchy)" error={errors.title}>
           <Input
             type="text"
             value={title}
             onChange={(ev) => setTitle(ev.target.value)}
-            placeholder="My lovely apartment"
-            required
+            placeholder="e.g., Cozy Cottage in the Hills"
+            className={errors.title ? "border-red-500 focus-visible:ring-red-200" : ""}
           />
         </PlaceFormSection>
 
-        {/* Location Section */}
-        <PlaceFormSection
-          title="Location"
-          subtitle="(Search and pin your exact location)"
-          error={errors.address}
-        >
+        {/* Location */}
+        <PlaceFormSection title="Location" subtitle="(Search and pin your exact location)" error={errors.address}>
           <LocationSection
-            address={address}
-            setAddress={setAddress}
-            coordinates={coordinates}
-            setCoordinates={setCoordinates}
-            city={city}
-            setCity={setCity}
-            state={state}
-            setState={setState}
-            country={country}
-            setCountry={setCountry}
+            address={address} setAddress={setAddress}
+            coordinates={coordinates} setCoordinates={setCoordinates}
+            city={city} setCity={setCity}
+            state={state} setState={setState}
+            country={country} setCountry={setCountry}
             reverseGeocode={reverseGeocode}
           />
         </PlaceFormSection>
 
         {/* Photos */}
-        <PlaceFormSection
-          title="Photos"
-          subtitle="Add more photos for better visibility"
-          error={errors.photos}
-        >
+        <PlaceFormSection title="Photos" subtitle="Add at least 3 photos" error={errors.photos}>
           <PhotosUploader addedPhotos={addedPhotos} onChange={setAddedPhotos} />
         </PlaceFormSection>
 
@@ -202,27 +237,19 @@ export default function PlacesFormPage() {
             onChange={(ev) => setDescription(ev.target.value)}
             placeholder="Describe your place..."
             rows={5}
-            required
+            className={errors.description ? "border-red-500 focus-visible:ring-red-200" : ""}
           />
         </PlaceFormSection>
 
         {/* Perks */}
-        <PlaceFormSection
-          title="Perks"
-          subtitle="Select all perks available at your place"
-          error={errors.perks}
-        >
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 mt-2">
+        <PlaceFormSection title="Perks" subtitle="Select available amenities" error={errors.perks}>
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 mt-2">
             <Perks selected={perks} onChange={setPerks} />
           </div>
         </PlaceFormSection>
 
         {/* Extra Info */}
-        <PlaceFormSection
-          title="Extra info"
-          subtitle="House rules, additional info, etc."
-          error={errors.extraInfo}
-        >
+        <PlaceFormSection title="Extra info" subtitle="House rules, etc." error={errors.extraInfo}>
           <Textarea
             value={extraInfo}
             onChange={(ev) => setExtraInfo(ev.target.value)}
@@ -231,58 +258,48 @@ export default function PlacesFormPage() {
           />
         </PlaceFormSection>
 
-        {/* Check-in/out and Price */}
-        <PlaceFormSection
-          title="Check-in & out times & Price"
-          subtitle="Set check-in/out times, max guests, and price per night"
-        >
+        {/* Check-in/out & Price */}
+        <PlaceFormSection title="Details" subtitle="Check-in/out times & Pricing">
           <DateTimePriceSection
-            checkIn={checkIn}
-            setCheckIn={setCheckIn}
-            checkOut={checkOut}
-            setCheckOut={setCheckOut}
-            maxGuests={maxGuests}
-            setMaxGuests={setMaxGuests}
-            price={price}
-            setPrice={setPrice}
-            errors={errors}
+            checkIn={checkIn} setCheckIn={setCheckIn}
+            checkOut={checkOut} setCheckOut={setCheckOut}
+            maxGuests={maxGuests} setMaxGuests={setMaxGuests}
+            price={price} setPrice={setPrice}
+            errors={errors} // Pass errors down to highlight specific inputs
           />
         </PlaceFormSection>
 
-        {/* Save/Delete Buttons */}
-        <div className="flex justify-between items-center pt-4">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6 border-t">
           {id && (
             <Button
-              variant="destructive"
+              variant="outline"
               type="button"
               onClick={() => setConfirmModal(true)}
-              className="flex items-center gap-2"
+              disabled={isSaving}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
             >
-              <Trash2 className="w-4 h-4" /> Delete
+              <Trash2 className="w-4 h-4 mr-2" /> Delete Place
             </Button>
           )}
+          
           <Button
-            className="px-6 py-3 text-base font-semibold rounded-lg bg-rose-500 hover:bg-rose-600 text-white ml-auto"
+            className="w-full sm:w-auto sm:ml-auto bg-rose-500 hover:bg-rose-600 text-white min-w-[150px]"
             type="submit"
+            disabled={isSaving}
           >
-            Save Place
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+              </>
+            ) : (
+              "Save Property"
+            )}
           </Button>
         </div>
-
-        {/* Validation Errors */}
-        {Object.keys(errors).length > 0 && (
-          <div className="bg-red-50 border border-red-300 text-red-700 p-3 rounded-lg mt-4">
-            <p className="font-semibold mb-1">Please fix the following errors:</p>
-            <ul className="list-disc list-inside text-sm">
-              {Object.entries(errors).map(([field, messages]) => (
-                <li key={field}>{messages[0]}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </form>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       <DeleteConfirmationModal
         isOpen={confirmModal}
         onClose={() => setConfirmModal(false)}
