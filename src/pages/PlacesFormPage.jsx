@@ -96,7 +96,7 @@ export default function PlacesFormPage() {
         }
       })
       .catch(err => {
-         setGlobalError("Failed to load place details. Please refresh.");
+         setGlobalError("Failed to load place details. Please refresh."+ err);
       })
       .finally(() => setIsLoading(false));
   }, [id]);
@@ -175,7 +175,7 @@ export default function PlacesFormPage() {
       await axios.delete(`/places/${id}`, { withCredentials: true });
       setRedirect(true);
     } catch (error) {
-      setGlobalError("Failed to delete place. It might be booked.");
+      setGlobalError("Failed to delete place. It might be booked."+error);
       setConfirmModal(false);
     } finally {
       setIsDeleting(false);
